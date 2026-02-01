@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Data - Seasonal Sales Forecasting</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+      .upload-container {
+        max-width: 700px;
+        margin: 2rem auto;
+      }
+
+      .upload-zone {
+        border: 3px dashed #667eea;
+        border-radius: 8px;
+        padding: 3rem 2rem;
+        text-align: center;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+        transition: all 0.3s;
+        cursor: pointer;
+      }
+
+      .upload-zone:hover {
+        border-color: #764ba2;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+      }
+
+      .upload-zone.dragover {
+        border-color: #764ba2;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
+      }
+
+      .upload-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+      }
+
+      .upload-zone p {
+        margin: 0.5rem 0;
+        color: #2c3e50;
+      }
+
+      .upload-zone .small-text {
+        color: #999;
+        font-size: 0.9rem;
+      }
+
+      #file-input {
+        display: none;
+      }
+
+      .file-name {
+        margin-top: 1rem;
+        padding: 1rem;
+        background: #f5f5f5;
+        border-radius: 4px;
+        display: none;
+      }
+
+      .file-name.show {
+        display: block;
+      }
+
+      .requirements-section {
+        margin-top: 2rem;
+      }
+
+      .requirements-box {
+        background: #e8f5e9;
+        border-left: 4px solid #4CAF50;
+        padding: 1.5rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+      }
+
+      .requirements-box h3 {
+        color: #2e7d32;
+        margin-top: 0;
+      }
+
+      .requirements-box ul {
+        margin: 0.5rem 0;
+        padding-left: 1.5rem;
+        color: #333;
+      }
+
+      .requirements-box li {
+        margin: 0.5rem 0;
+      }
+
+      .example-box {
+        background: #f5f5f5;
+        border-left: 4px solid #2196F3;
+        padding: 1.5rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9rem;
+        overflow-x: auto;
+      }
+
+      .example-box h3 {
+        color: #0b7dda;
+        margin-top: 0;
+      }
+
+      .example-box pre {
+        margin: 0;
+        color: #333;
+      }
+
+      .button-group {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+      }
+
+      button[type="submit"] {
+        flex: 1;
+      }
+
+      .secondary-btn {
+        background: #f5f5f5;
+        color: #333;
+        border: 2px solid #ddd;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+
+      .secondary-btn:hover {
+        background: #e8e8e8;
+        border-color: #999;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>📊 Seasonal Sales Forecasting</h1>
+      <ul class="nav-links">
+        <li><a href="/dashboard">Dashboard</a></li>
+        <li><a href="/analysis">Analysis</a></li>
+        <li><a href="/forecast">Forecast</a></li>
+        <li><a href="/recommendation">Recommendations</a></li>
+        <li><a href="/logout">Logout</a></li>
+      </ul>
+    </header>
+
+    <div class="container upload-container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <ul class="flashes">
+          {% for category, message in messages %}
+            <li class="{{ category }}">{{ message }}</li>
+          {% endfor %}
+          </ul>
+        {% endif %}
+      {% endwith %}
+
+      <div class="card">
+        <h1>📤 Upload Sales Data</h1>
+        <p>Upload your historical sales data in CSV format for analysis and forecasting.</p>
+        {% if data_source %}
+        <div style="background: #e8f5e9; border-left: 4px solid #4CAF50; padding: 1rem; margin-top: 1rem; border-radius: 4px;">
+          <strong>📊 Current Data Source:</strong> {{ data_source.title() }} Dataset
+        </div>
+        {% endif %}
+      </div>
+
+      <form id="upload-form" enctype="multipart/form-data" method="post">
+        <div class="card upload-zone" id="upload-zone">
+          <div class="upload-icon">📁</div>
+          <p style="font-weight: 600;">Click to select or drag & drop your CSV file</p>
+          <p class="small-text">Supported format: CSV (Comma-Separated Values)</p>
+          <input type="file" id="file-input" name="file" accept=".csv" required>
+        </div>
+
+        <div class="file-name" id="file-name">
+          <strong>Selected file:</strong> <span id="file-name-text"></span>
+          <button type="button" class="secondary-btn" style="margin-top: 0.5rem;" onclick="document.getElementById('file-input').value = ''; document.getElementById('file-name').classList.remove('show');">Clear</button>
+        </div>
+
+        <div class="button-group">
+          <button type="submit" id="upload-btn" style="opacity: 0.6; cursor: not-allowed;" disabled>Upload File</button>
+        </div>
+      </form>
+
+      <div class="requirements-section">
+        <div class="requirements-box">
+          <h3>✅ File Requirements</h3>
+          <ul>
+            <li><strong>Format:</strong> CSV (Comma-Separated Values)</li>
+            <li><strong>Maximum size:</strong> 16 MB</li>
+            <li><strong>Required columns:</strong> Date and Sales</li>
+            <li><strong>Optional columns:</strong> Store ID / Store Name</li>
+            <li><strong>Date format:</strong> DD-MM-YYYY or YYYY-MM-DD</li>
+            <li><strong>Sales values:</strong> Numeric (integers or decimals)</li>
+          </ul>
+        </div>
+
+        <div class="example-box">
+          <h3>📋 Example CSV Format</h3>
+          <pre>Date,Sales,Store
+05-02-2010,1643690.9,1
+12-02-2010,1641957.44,1
+19-02-2010,1611968.17,1
+26-02-2010,1409727.59,1</pre>
+        </div>
+
+        <div class="requirements-box" style="background: #fff3cd; border-left-color: #ffc107;">
+          <h3 style="color: #856404;">⚠️ Important Notes</h3>
+          <ul style="color: #333;">
+            <li>Your uploaded file will be validated and standardized</li>
+            <li>Data will be sorted chronologically by date</li>
+            <li>Any invalid records will be flagged during validation</li>
+            <li>Uploaded files are stored securely in the data folder</li>
+            <li>Only you can access your uploaded data within this session</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const uploadZone = document.getElementById('upload-zone');
+      const fileInput = document.getElementById('file-input');
+      const fileNameDiv = document.getElementById('file-name');
+      const fileNameText = document.getElementById('file-name-text');
+      const uploadBtn = document.getElementById('upload-btn');
+
+      // Click to select file
+      uploadZone.addEventListener('click', () => fileInput.click());
+
+      // Drag and drop
+      uploadZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadZone.classList.add('dragover');
+      });
+
+      uploadZone.addEventListener('dragleave', () => {
+        uploadZone.classList.remove('dragover');
+      });
+
+      uploadZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+          fileInput.files = e.dataTransfer.files;
+          updateFileName();
+        }
+      });
+
+      // File input change
+      fileInput.addEventListener('change', updateFileName);
+
+      function updateFileName() {
+        if (fileInput.files.length > 0) {
+          const file = fileInput.files[0];
+          const fileName = file.name;
+          const fileSize = (file.size / 1024 / 1024).toFixed(2);
+          
+          fileNameText.textContent = `${fileName} (${fileSize} MB)`;
+          fileNameDiv.classList.add('show');
+          uploadBtn.disabled = false;
+          uploadBtn.style.opacity = '1';
+          uploadBtn.style.cursor = 'pointer';
+        } else {
+          fileNameDiv.classList.remove('show');
+          uploadBtn.disabled = true;
+          uploadBtn.style.opacity = '0.6';
+          uploadBtn.style.cursor = 'not-allowed';
+        }
+      }
+    </script>
+  </body>
+</html>

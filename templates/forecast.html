@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Forecast Visualization</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .nav-links {
+            list-style: none;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        
+        .nav-links a:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .controls {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .controls button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.3s;
+        }
+        
+        .controls button:hover {
+            background: #764ba2;
+        }
+        
+        .controls button.secondary {
+            background: #6c757d;
+        }
+        
+        .controls button.secondary:hover {
+            background: #5a6268;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .forecast-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .forecast-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .forecast-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .forecast-card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+        }
+        
+        .forecast-card-header h3 {
+            font-size: 1.4em;
+            margin-bottom: 5px;
+        }
+        
+        .forecast-card-body {
+            padding: 20px;
+        }
+        
+        .forecast-image {
+            width: 100%;
+            height: auto;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .stat-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .stat-box h4 {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        
+        .stat-box p {
+            color: #333;
+            font-size: 1.3em;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .scenario-comparison {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .scenario-box {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .scenario-box.baseline {
+            background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+        }
+        
+        .scenario-box.pessimistic {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+        
+        .scenario-box.optimistic {
+            background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+        }
+        
+        .scenario-box h4 {
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .scenario-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: white;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .footer {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        #status {
+            margin-left: auto;
+            color: #666;
+        }
+        
+        .chart-placeholder {
+            background: #f5f7fa;
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            padding: 40px;
+            text-align: center;
+            color: #999;
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .controls button {
+                width: 100%;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📊 Seasonal Sales Forecasting</h1>
+        <ul class="nav-links">
+            <li><a href="/dashboard">Dashboard</a></li>
+            <li><a href="/analysis">Analysis</a></li>
+            <li><a href="/recommendation">Recommendations</a></li>
+            <li><a href="/logout">Logout</a></li>
+        </ul>
+    </header>
+
+    <div class="container">
+        <div class="header">
+            <h1>📊 Sales Forecast Visualization</h1>
+            <p>Historical data & future predictions with confidence intervals</p>
+        </div>
+        
+        <div class="controls">
+            <button onclick="generateVisualizations()">Generate All Visualizations</button>
+            <button class="secondary" onclick="refreshPage()">Refresh</button>
+            <span id="status"></span>
+        </div>
+        
+        <div class="content">
+            <!-- Historical vs Forecast -->
+            <div class="forecast-card">
+                <div class="forecast-card-header">
+                    <h3>📈 Historical vs Forecast</h3>
+                    <p>Blue line: Historical sales | Red line: Predicted sales with 95% confidence interval</p>
+                </div>
+                <div class="forecast-card-body">
+                    {% if historical_vs_forecast %}
+                        <img src="/static/plots/historical_vs_forecast.png?t={{ now }}" class="forecast-image" alt="Historical vs Forecast">
+                        <div class="stats-grid">
+                            <div class="stat-box">
+                                <h4>Mean Forecast</h4>
+                                <p>${{ "{:,.0f}".format(forecast_mean) }}</p>
+                            </div>
+                            <div class="stat-box">
+                                <h4>Min Forecast</h4>
+                                <p>${{ "{:,.0f}".format(forecast_min) }}</p>
+                            </div>
+                            <div class="stat-box">
+                                <h4>Max Forecast</h4>
+                                <p>${{ "{:,.0f}".format(forecast_max) }}</p>
+                            </div>
+                            <div class="stat-box">
+                                <h4>Periods</h4>
+                                <p>{{ forecast_periods }}</p>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="chart-placeholder">
+                            <p>Click "Generate All Visualizations" to create charts</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Confidence Intervals -->
+            <div class="forecast-card">
+                <div class="forecast-card-header">
+                    <h3>🎯 Forecast with Confidence Intervals</h3>
+                    <p>Light blue areas show 95% CI (outer) and 68% CI (inner) - wider bands indicate more uncertainty</p>
+                </div>
+                <div class="forecast-card-body">
+                    {% if confidence_intervals %}
+                        <img src="/static/plots/confidence_intervals.png?t={{ now }}" class="forecast-image" alt="Confidence Intervals">
+                        <div class="stats-grid">
+                            <div class="stat-box">
+                                <h4>Confidence Level</h4>
+                                <p>95%</p>
+                            </div>
+                            <div class="stat-box">
+                                <h4>CI Avg Width</h4>
+                                <p>${{ "{:,.0f}".format(ci_avg_width) }}</p>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="chart-placeholder">
+                            <p>Visualization will appear here</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Forecast Statistics -->
+            <div class="forecast-card">
+                <div class="forecast-card-header">
+                    <h3>📊 Forecast Statistics</h3>
+                    <p>Distribution, trends, and summary metrics for the forecast period</p>
+                </div>
+                <div class="forecast-card-body">
+                    {% if forecast_statistics %}
+                        <img src="/static/plots/forecast_statistics.png?t={{ now }}" class="forecast-image" alt="Forecast Statistics">
+                    {% else %}
+                        <div class="chart-placeholder">
+                            <p>Visualization will appear here</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Scenario Analysis -->
+            {% if scenario_comparison %}
+            <div class="forecast-card">
+                <div class="forecast-card-header">
+                    <h3>🎬 Scenario Analysis</h3>
+                    <p>Green: Baseline forecast | Red: Pessimistic (-5%) | Blue: Optimistic (+5%)</p>
+                </div>
+                <div class="forecast-card-body">
+                    <img src="/static/plots/scenario_comparison.png?t={{ now }}" class="forecast-image" alt="Scenario Comparison">
+                    
+                    <h4 style="margin-top: 20px; margin-bottom: 15px;">Scenario Summary</h4>
+                    <div class="scenario-comparison">
+                        <div class="scenario-box baseline">
+                            <h4>Baseline</h4>
+                            <p style="font-size: 0.85em; margin-bottom: 8px;">Standard Forecast</p>
+                            <div class="scenario-value">${{ "{:,.0f}".format(baseline_mean) }}</div>
+                        </div>
+                        <div class="scenario-box pessimistic">
+                            <h4>Pessimistic</h4>
+                            <p style="font-size: 0.85em; margin-bottom: 8px;">-5% Growth</p>
+                            <div class="scenario-value">${{ "{:,.0f}".format(pessimistic_mean) }}</div>
+                        </div>
+                        <div class="scenario-box optimistic">
+                            <h4>Optimistic</h4>
+                            <p style="font-size: 0.85em; margin-bottom: 8px;">+5% Growth</p>
+                            <div class="scenario-value">${{ "{:,.0f}".format(optimistic_mean) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="footer">
+            <p>STEP 15: Forecast Visualization Module | Generated: <span id="generated-time">{{ generated_time }}</span></p>
+            <p style="font-size: 0.9em; margin-top: 10px;">Data based on ARIMA(0, 0, 1) model with 95% confidence intervals</p>
+        </div>
+    </div>
+    
+    <script>
+        function generateVisualizations() {
+            const status = document.getElementById('status');
+            status.textContent = 'Generating...';
+            status.style.color = '#667eea';
+            
+            fetch('/api/visualizations/generate', {
+                method: 'GET'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    status.textContent = '✓ Generated!';
+                    status.style.color = '#28a745';
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    status.textContent = '✗ Error: ' + (data.error || 'Unknown error');
+                    status.style.color = '#dc3545';
+                }
+            })
+            .catch(error => {
+                status.textContent = '✗ Error: ' + error.message;
+                status.style.color = '#dc3545';
+            });
+        }
+        
+        function refreshPage() {
+            location.reload();
+        }
+        
+        // Update timestamp
+        document.getElementById('generated-time').textContent = new Date().toLocaleString();
+    </script>
+</body>
+</html>

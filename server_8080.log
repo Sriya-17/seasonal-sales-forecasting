@@ -1,0 +1,14 @@
+✅ Sales database initialized
+Removed 6292 duplicate records
+✅ Data loaded successfully from uploaded dataset (143 records)
+📊 Preprocessing: 6292 records removed, 0 missing values remain
+ * Serving Flask app 'app' (lazy loading)
+ * Environment: production
+   WARNING: This is a development server. Do not use it in a production deployment.
+   Use a production WSGI server instead.
+ * Debug mode: on
+INFO:werkzeug: * Running on http://127.0.0.1:8080/ (Press CTRL+C to quit)
+INFO:werkzeug: * Restarting with stat
+WARNING:werkzeug: * Debugger is active!
+INFO:werkzeug: * Debugger PIN: 117-011-355
+INFO:werkzeug:127.0.0.1 - - [31/Jan/2026 22:38:55] "HEAD /health HTTP/1.1" 200 -

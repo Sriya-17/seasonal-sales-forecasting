@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recommendations - Seasonal Sales Forecasting</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/result_display.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .recommendations-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: var(--card-shadow);
+        }
+        
+        .recommendations-header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: white;
+        }
+        
+        .recommendations-header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin: 0;
+        }
+        
+        .recommendations-controls {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: var(--card-shadow);
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .recommendations-controls button {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .recommendations-controls button:hover {
+            background: var(--secondary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .executive-summary {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            border-left: 4px solid var(--primary-color);
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+        }
+        
+        .summary-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        .summary-section:last-child {
+            margin-bottom: 0;
+        }
+        
+        .summary-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+        
+        .summary-text {
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        .insights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .insight-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            border-top: 3px solid var(--success-color);
+        }
+        
+        .insight-card h3 {
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+        
+        .insight-card p {
+            color: #666;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        
+        .recommendations-section {
+            margin-bottom: 3rem;
+        }
+        
+        .section-title {
+            font-size: 1.5rem;
+            color: var(--dark-bg);
+            margin-bottom: 1.5rem;
+            border-bottom: 3px solid var(--primary-color);
+            padding-bottom: 0.5rem;
+        }
+        
+        .recommendations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .recommendation-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            border-left: 4px solid var(--primary-color);
+            transition: var(--transition);
+        }
+        
+        .recommendation-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .recommendation-month {
+            font-size: 0.85rem;
+            color: #999;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 0.8rem;
+        }
+        
+        .recommendation-action {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--dark-bg);
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .action-badge {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .action-badge.increase {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+        
+        .action-badge.decrease {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+        }
+        
+        .action-badge.maintain {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--info-color);
+        }
+        
+        .priority-badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        
+        .priority-badge.high {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+        }
+        
+        .priority-badge.medium {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning-color);
+        }
+        
+        .priority-badge.low {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+        
+        .recommendation-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+        
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem;
+            background: var(--light-bg);
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .detail-label {
+            font-weight: 600;
+            color: var(--dark-bg);
+        }
+        
+        .detail-value {
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+        
+        .strategy-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 2rem;
+        }
+        
+        .strategy-table th {
+            background: var(--light-bg);
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--dark-bg);
+            border-bottom: 2px solid var(--primary-color);
+        }
+        
+        .strategy-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--light-bg);
+        }
+        
+        .strategy-table tr:hover {
+            background: var(--light-bg);
+        }
+        
+        .strategy-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .action-type {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .action-type.increase {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+        
+        .action-type.decrease {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+        }
+        
+        .action-type.maintain {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--info-color);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--light-bg);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📊 Seasonal Sales Forecasting</h1>
+        <ul class="nav-links">
+            <li><a href="/dashboard">Dashboard</a></li>
+            <li><a href="/analysis">Analysis</a></li>
+            <li><a href="/forecast">Forecast</a></li>
+            <li><a href="/logout">Logout</a></li>
+        </ul>
+    </header>
+
+    <div class="container">
+        <!-- Recommendations Header -->
+        <div class="recommendations-header">
+            <h1>💡 Business Recommendations</h1>
+            <p>AI-powered insights for inventory, pricing, and seasonal strategies</p>
+        </div>
+
+        <!-- Controls -->
+        <div class="recommendations-controls">
+            <button onclick="generateRecommendations()">🔄 Generate Fresh Recommendations</button>
+            <button onclick="downloadRecommendations()">⬇️ Download Report</button>
+            <span style="color: #999; font-size: 0.9rem; margin-left: auto;" id="lastUpdated">Last updated: Just now</span>
+        </div>
+
+        <!-- Executive Summary -->
+        <div class="recommendations-section">
+            <h2 class="section-title">📋 Executive Summary</h2>
+            <div class="executive-summary" id="executiveSummary">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading recommendations...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Insights -->
+        <div class="recommendations-section">
+            <h2 class="section-title">🎯 Key Insights</h2>
+            <div class="insights-grid" id="keyInsightsContainer">
+                <div class="loading">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Demand Analysis -->
+        <div class="recommendations-section">
+            <h2 class="section-title">📊 Demand Analysis</h2>
+            <div id="demandAnalysisContainer">
+                <div class="card">
+                    <table class="strategy-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Value</th>
+                                <th>Interpretation</th>
+                            </tr>
+                        </thead>
+                        <tbody id="demandTable">
+                            <tr>
+                                <td colspan="3" class="text-center">Loading demand analysis...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stock Recommendations -->
+        <div class="recommendations-section">
+            <h2 class="section-title">📦 Stock Recommendations</h2>
+            <p style="color: #666; margin-bottom: 1.5rem;">Monthly inventory adjustment recommendations based on predicted demand patterns:</p>
+            <div class="recommendations-grid" id="stockRecommendationsContainer">
+                <div class="loading">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pricing Strategy -->
+        <div class="recommendations-section">
+            <h2 class="section-title">💰 Pricing Strategy</h2>
+            <p style="color: #666; margin-bottom: 1.5rem;">Dynamic pricing recommendations to optimize revenue throughout the year:</p>
+            <div class="card">
+                <table class="strategy-table">
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Strategy</th>
+                            <th>Recommended Discount</th>
+                            <th>Rationale</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pricingTable">
+                        <tr>
+                            <td colspan="4" class="text-center">Loading pricing strategy...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Festival Promotions -->
+        <div class="recommendations-section">
+            <h2 class="section-title">🎉 Festival Promotions</h2>
+            <p style="color: #666; margin-bottom: 1.5rem;">Seasonal campaign recommendations to maximize sales during peak periods:</p>
+            <div class="card">
+                <table class="strategy-table">
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Festival</th>
+                            <th>Recommended Discount</th>
+                            <th>Stock Increase</th>
+                            <th>Campaign Intensity</th>
+                        </tr>
+                    </thead>
+                    <tbody id="festivalsTable">
+                        <tr>
+                            <td colspan="5" class="text-center">Loading festival promotions...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Action Items -->
+        <div class="recommendations-section">
+            <h2 class="section-title">✅ Action Items</h2>
+            <div class="card">
+                <ol style="color: #666; line-height: 2; font-size: 1rem;">
+                    <li><strong style="color: var(--primary-color);">Inventory Planning:</strong> Prepare additional stock before peak seasons identified in demand analysis.</li>
+                    <li><strong style="color: var(--primary-color);">Pricing Adjustments:</strong> Implement dynamic pricing strategies to maintain competitiveness and maximize margins.</li>
+                    <li><strong style="color: var(--primary-color);">Festival Campaigns:</strong> Launch targeted promotional campaigns during recommended festival periods.</li>
+                    <li><strong style="color: var(--primary-color);">Marketing Allocation:</strong> Allocate marketing budget based on campaign intensity levels across months.</li>
+                    <li><strong style="color: var(--primary-color);">Performance Tracking:</strong> Monitor actual sales against forecasts and adjust strategies monthly.</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let recommendationData = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadRecommendations();
+        });
+
+        function loadRecommendations() {
+            fetch('/api/recommendations')
+                .then(response => response.json())
+                .then(data => {
+                    recommendationData = data;
+                    updateExecutiveSummary(data);
+                    updateKeyInsights(data);
+                    updateDemandAnalysis(data);
+                    updateStockRecommendations(data);
+                    updatePricingStrategy(data);
+                    updateFestivals(data);
+                })
+                .catch(error => {
+                    console.error('Error loading recommendations:', error);
+                    document.getElementById('executiveSummary').innerHTML = 
+                        '<div style="color: red; padding: 2rem; text-align: center;">Error loading recommendations. Please refresh.</div>';
+                });
+        }
+
+        function updateExecutiveSummary(data) {
+            if (data.summary) {
+                const summary = data.summary;
+                document.getElementById('executiveSummary').innerHTML = `
+                    <div class="summary-section">
+                        <div class="summary-title">📊 Overall Assessment</div>
+                        <div class="summary-text">${summary.overall || 'Loading summary...'}</div>
+                    </div>
+                    ${(summary.insights || []).map((insight, idx) => `
+                        <div class="summary-section">
+                            <div class="summary-title">💡 Insight ${idx + 1}</div>
+                            <div class="summary-text">${insight}</div>
+                        </div>
+                    `).join('')}
+                `;
+            }
+        }
+
+        function updateKeyInsights(data) {
+            if (data.summary && data.summary.insights) {
+                const insights = [
+                    { title: '📈 Volatility', desc: 'Sales show moderate to high volatility indicating seasonal variations' },
+                    { title: '💡 Peak Pattern', desc: 'Strong peak periods identified for targeted promotional campaigns' },
+                    { title: '🎯 Optimization', desc: 'Implement dynamic pricing to maximize revenue during peak and low seasons' }
+                ];
+                
+                document.getElementById('keyInsightsContainer').innerHTML = insights.map((insight, idx) => `
+                    <div class="insight-card">
+                        <h3>${insight.title}</h3>
+                        <p>${insight.desc}</p>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function updateDemandAnalysis(data) {
+            if (data.demand_analysis) {
+                const demand = data.demand_analysis;
+                document.getElementById('demandTable').innerHTML = `
+                    <tr>
+                        <td><strong>Average Demand</strong></td>
+                        <td>$${(demand.overall_mean || 0).toFixed(0)}</td>
+                        <td>Baseline sales level for planning</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Volatility Index</strong></td>
+                        <td>${(demand.volatility || 0).toFixed(2)}</td>
+                        <td>${(demand.volatility || 0) > 0.5 ? 'High volatility - needs flexible inventory' : 'Moderate volatility - standard planning'}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>High Demand Threshold</strong></td>
+                        <td>$${(demand.high_threshold || 0).toFixed(0)}</td>
+                        <td>${demand.high_count || 0} months exceeding this level</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Low Demand Threshold</strong></td>
+                        <td>$${(demand.low_threshold || 0).toFixed(0)}</td>
+                        <td>${demand.low_count || 0} months below this level</td>
+                    </tr>
+                `;
+            }
+        }
+
+        function updateStockRecommendations(data) {
+            if (data.stock_recommendations) {
+                const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                              'July', 'August', 'September', 'October', 'November', 'December'];
+                
+                document.getElementById('stockRecommendationsContainer').innerHTML = 
+                    data.stock_recommendations.map((rec, idx) => {
+                        const actionClass = rec.action.toLowerCase();
+                        const actionEmoji = rec.action === 'INCREASE' ? '📈' : rec.action === 'DECREASE' ? '📉' : '➡️';
+                        return `
+                            <div class="recommendation-card">
+                                <div class="recommendation-month">${months[idx]}</div>
+                                <div class="recommendation-action">
+                                    <span>${actionEmoji} ${rec.action}</span>
+                                    <span class="action-badge ${actionClass}">${rec.priority}</span>
+                                </div>
+                                <div class="recommendation-details">
+                                    <div class="detail-row">
+                                        <span class="detail-label">Expected Sales:</span>
+                                        <span class="detail-value">$${(rec.expected_sales || 0).toFixed(0)}</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="detail-label">Adjustment:</span>
+                                        <span class="detail-value">${(rec.percentage_change || 0).toFixed(1)}%</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="detail-label">Rationale:</span>
+                                        <span class="detail-value">${rec.rationale || 'Market adjustment'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+            }
+        }
+
+        function updatePricingStrategy(data) {
+            if (data.pricing_recommendations) {
+                const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                              'July', 'August', 'September', 'October', 'November', 'December'];
+                
+                document.getElementById('pricingTable').innerHTML = 
+                    data.pricing_recommendations.map((rec, idx) => `
+                        <tr>
+                            <td><strong>${months[idx]}</strong></td>
+                            <td><span class="action-type ${rec.strategy.toLowerCase()}">${rec.strategy}</span></td>
+                            <td><strong>${(rec.discount_percentage || 0).toFixed(1)}%</strong></td>
+                            <td>${rec.rationale || 'Market conditions'}</td>
+                        </tr>
+                    `).join('');
+            }
+        }
+
+        function updateFestivals(data) {
+            if (data.festival_promotions) {
+                const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                              'July', 'August', 'September', 'October', 'November', 'December'];
+                
+                document.getElementById('festivalsTable').innerHTML = 
+                    data.festival_promotions.map((festival, idx) => `
+                        <tr>
+                            <td><strong>${months[idx]}</strong></td>
+                            <td><strong>${festival.festival_name || 'General Promotion'}</strong></td>
+                            <td>${(festival.discount_percentage || 0).toFixed(1)}%</td>
+                            <td>${(festival.stock_increase_percentage || 0).toFixed(1)}%</td>
+                            <td><span class="action-type">${festival.campaign_intensity || 'MODERATE'}</span></td>
+                        </tr>
+                    `).join('');
+            }
+        }
+
+        function generateRecommendations() {
+            fetch('/api/recommendations/generate')
+                .then(response => response.json())
+                .then(data => {
+                    recommendationData = data;
+                    updateExecutiveSummary(data);
+                    updateKeyInsights(data);
+                    updateDemandAnalysis(data);
+                    updateStockRecommendations(data);
+                    updatePricingStrategy(data);
+                    updateFestivals(data);
+                    document.getElementById('lastUpdated').textContent = 'Last updated: Just now';
+                })
+                .catch(error => console.error('Error generating recommendations:', error));
+        }
+
+        function downloadRecommendations() {
+            if (!recommendationData) {
+                alert('No recommendations to download');
+                return;
+            }
+
+            let content = 'SEASONAL SALES FORECASTING - RECOMMENDATIONS REPORT\n';
+            content += '='.repeat(60) + '\n\n';
+            
+            if (recommendationData.summary) {
+                content += 'EXECUTIVE SUMMARY\n';
+                content += '-'.repeat(40) + '\n';
+                content += (recommendationData.summary.overall || '') + '\n\n';
+            }
+
+            if (recommendationData.stock_recommendations) {
+                content += 'STOCK RECOMMENDATIONS\n';
+                content += '-'.repeat(40) + '\n';
+                recommendationData.stock_recommendations.forEach((rec, idx) => {
+                    content += `Month ${idx + 1}: ${rec.action} (${rec.priority})\n`;
+                    content += `  Expected Sales: $${rec.expected_sales}\n`;
+                    content += `  Change: ${rec.percentage_change.toFixed(1)}%\n\n`;
+                });
+            }
+
+            const element = document.createElement('a');
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(content));
+            element.setAttribute('download', 'recommendations.txt');
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+    </script>
+</body>
+</html>

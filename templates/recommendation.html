@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Recommendations - DEA Project</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            animation: slideDown 0.6s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        nav {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin: 0 20px;
+            font-weight: 500;
+            transition: opacity 0.3s;
+        }
+
+        nav a:hover {
+            opacity: 0.8;
+        }
+
+        .controls {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 0 10px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .status {
+            color: white;
+            margin-top: 15px;
+            font-weight: 500;
+            min-height: 20px;
+        }
+
+        .status.loading {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section-title {
+            font-size: 2em;
+            color: white;
+            margin-bottom: 20px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title span {
+            font-size: 0.8em;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+            animation: fadeIn 0.5s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+        }
+
+        .card-header {
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .month {
+            color: #667eea;
+            font-weight: 700;
+            margin-bottom: 15px;
+        }
+
+        .action-badge {
+            display: inline-block;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.85em;
+            margin-bottom: 12px;
+        }
+
+        .action-badge.increase {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .action-badge.decrease {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .action-badge.maintain {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .priority-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-weight: 600;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+
+        .priority-badge.high {
+            background: #ffcdd2;
+            color: #b71c1c;
+        }
+
+        .priority-badge.medium {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .priority-badge.low {
+            background: #e0f2f1;
+            color: #004d40;
+        }
+
+        .card-content {
+            color: #555;
+            line-height: 1.6;
+            font-size: 0.95em;
+        }
+
+        .stat {
+            margin: 10px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .stat:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: #777;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            color: #333;
+            font-weight: 700;
+            font-size: 1.1em;
+        }
+
+        .strategy-badge {
+            display: inline-block;
+            padding: 10px 15px;
+            border-radius: 8px;
+            background: #f5f5f5;
+            color: #333;
+            font-weight: 600;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+
+        .strategy-badge.premium {
+            background: #fff9c4;
+            color: #f57f17;
+        }
+
+        .strategy-badge.normal {
+            background: #e8eaf6;
+            color: #3949ab;
+        }
+
+        .strategy-badge.light {
+            background: #f3e5f5;
+            color: #6a1b9a;
+        }
+
+        .strategy-badge.aggressive {
+            background: #ffccbc;
+            color: #bf360c;
+        }
+
+        .campaign-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+
+        .campaign-badge.standard {
+            background: #e0e0e0;
+            color: #424242;
+        }
+
+        .campaign-badge.aggressive {
+            background: #ff6e40;
+            color: white;
+        }
+
+        .festival-name {
+            font-size: 1.2em;
+            color: #667eea;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .promotional-message {
+            font-size: 1.05em;
+            font-weight: 500;
+            color: #333;
+            margin: 10px 0;
+            padding: 10px;
+            background: #f9f9f9;
+            border-left: 4px solid #667eea;
+        }
+
+        .summary-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .summary-title {
+            font-size: 1.8em;
+            color: #333;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .summary-text {
+            color: #555;
+            line-height: 1.8;
+            font-size: 1.05em;
+            margin-bottom: 20px;
+        }
+
+        .insights {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .insight {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 0.95em;
+            line-height: 1.6;
+        }
+
+        .demand-analysis {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+        }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .metric {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .metric-label {
+            color: #777;
+            font-size: 0.85em;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .metric-value {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 50px;
+            padding: 20px;
+            opacity: 0.8;
+            font-size: 0.9em;
+        }
+
+        .empty-message {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            color: #999;
+            font-size: 1.1em;
+        }
+
+        .error-message {
+            background: #ffcdd2;
+            color: #b71c1c;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #b71c1c;
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 2em;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            nav a {
+                display: block;
+                margin: 10px 0;
+            }
+
+            .section-title {
+                font-size: 1.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>💡 Business Recommendations</h1>
+            <p>Smart suggestions based on sales analysis and forecasts</p>
+        </header>
+
+        <nav>
+            <a href="/">Dashboard</a>
+            <a href="/eda">Analysis</a>
+            <a href="/forecast">Forecast</a>
+            <a href="/recommendation" style="font-weight: bold; opacity: 1;">Recommendations</a>
+        </nav>
+
+        <div class="controls">
+            <button class="btn" onclick="generateRecommendations()">🔄 Generate Recommendations</button>
+            <button class="btn" onclick="refreshPage()">🔃 Refresh</button>
+            <div class="status" id="status"></div>
+        </div>
+
+        <!-- Recommendations Container -->
+        <div id="recommendations-container">
+            <!-- Content will be loaded here -->
+        </div>
+
+        <div class="footer">
+            <p>📊 Recommendation Engine • Based on historical sales data and forecasting models</p>
+            <p id="footer-timestamp"></p>
+        </div>
+    </div>
+
+    <script>
+        // Load recommendations on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadRecommendations();
+            updateFooterTimestamp();
+        });
+
+        function updateFooterTimestamp() {
+            const now = new Date();
+            document.getElementById('footer-timestamp').textContent = 
+                'Last updated: ' + now.toLocaleString();
+        }
+
+        function loadRecommendations() {
+            const container = document.getElementById('recommendations-container');
+            container.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 20px;">Loading recommendations...</p>
+                </div>
+            `;
+
+            fetch('/api/recommendations')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        displayRecommendations(data.recommendations);
+                    } else {
+                        container.innerHTML = `<div class="error-message">Error: ${data.message}</div>`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    container.innerHTML = `<div class="error-message">Failed to load recommendations. Please try again.</div>`;
+                });
+        }
+
+        function generateRecommendations() {
+            const status = document.getElementById('status');
+            status.textContent = '⏳ Generating recommendations...';
+            status.classList.add('loading');
+
+            fetch('/api/recommendations/generate')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        status.textContent = '✅ Recommendations generated!';
+                        status.classList.remove('loading');
+                        setTimeout(() => loadRecommendations(), 500);
+                        setTimeout(() => { status.textContent = ''; }, 3000);
+                    } else {
+                        status.textContent = '❌ Generation failed';
+                        status.classList.remove('loading');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    status.textContent = '❌ Error generating recommendations';
+                    status.classList.remove('loading');
+                });
+        }
+
+        function refreshPage() {
+            location.reload();
+        }
+
+        function displayRecommendations(recs) {
+            const container = document.getElementById('recommendations-container');
+            let html = '';
+
+            // Demand Analysis Section
+            if (recs.demand_analysis && recs.demand_analysis.status === 'success') {
+                const analysis = recs.demand_analysis;
+                html += `
+                    <div class="demand-analysis">
+                        <h2 class="summary-title">📊 Demand Analysis</h2>
+                        <div class="analysis-grid">
+                            <div class="metric">
+                                <div class="metric-label">Average Sales</div>
+                                <div class="metric-value">$${(analysis.overall_mean / 1e6).toFixed(1)}M</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Volatility Index</div>
+                                <div class="metric-value">${analysis.volatility.toFixed(2)}</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">High Demand Months</div>
+                                <div class="metric-value">${analysis.high_demand_count}</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Low Demand Months</div>
+                                <div class="metric-value">${analysis.low_demand_count}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Summary Section
+            if (recs.summary) {
+                html += `
+                    <div class="summary-section">
+                        <h2 class="summary-title">🎯 Executive Summary</h2>
+                        <div class="summary-text">${recs.summary.summary}</div>
+                        <div class="insights">
+                            <div class="insight">${recs.summary.key_insight_1}</div>
+                            <div class="insight">${recs.summary.key_insight_2}</div>
+                            <div class="insight">${recs.summary.key_insight_3}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Stock Recommendations
+            if (recs.stock_recommendations && recs.stock_recommendations.length > 0) {
+                html += '<div class="section">';
+                html += '<h2 class="section-title">📦 Stock Recommendations</h2>';
+                html += '<div class="grid">';
+
+                recs.stock_recommendations.forEach((rec, index) => {
+                    const actionClass = rec.action.toLowerCase();
+                    const priorityClass = rec.priority.toLowerCase();
+                    const change = rec.percentage_change >= 0 ? '+' : '';
+
+                    html += `
+                        <div class="card" style="animation-delay: ${index * 0.1}s">
+                            <div class="month">${rec.month}</div>
+                            <div>
+                                <span class="action-badge ${actionClass}">${rec.action}</span>
+                                <span class="priority-badge ${priorityClass}">${rec.priority}</span>
+                            </div>
+                            <div class="card-content">
+                                <div style="margin: 15px 0;">
+                                    <div class="stat">
+                                        <div class="stat-label">Recommendation</div>
+                                        <div class="stat-value" style="color: #667eea;">${rec.recommendation}</div>
+                                    </div>
+                                    <div class="stat">
+                                        <div class="stat-label">Demand Change</div>
+                                        <div class="stat-value">${change}${rec.percentage_change}%</div>
+                                    </div>
+                                    <div class="stat">
+                                        <div class="stat-label">Expected Sales</div>
+                                        <div class="stat-value">$${(rec.expected_sales / 1e6).toFixed(1)}M</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += '</div></div>';
+            }
+
+            // Pricing Recommendations
+            if (recs.pricing_recommendations && recs.pricing_recommendations.length > 0) {
+                html += '<div class="section">';
+                html += '<h2 class="section-title">💰 Pricing Strategy</h2>';
+                html += '<div class="grid">';
+
+                recs.pricing_recommendations.forEach((rec, index) => {
+                    const strategyClass = rec.strategy.toLowerCase().replace(/ /g, '-');
+
+                    html += `
+                        <div class="card" style="animation-delay: ${index * 0.1}s">
+                            <div class="month">${rec.month}</div>
+                            <div class="strategy-badge ${strategyClass}">${rec.strategy}</div>
+                            <div class="card-content">
+                                <div style="margin: 15px 0;">
+                                    <div class="stat">
+                                        <div class="stat-label">Discount Percentage</div>
+                                        <div class="stat-value">${rec.discount_percent}%</div>
+                                    </div>
+                                    <div class="stat">
+                                        <div class="stat-label">Strategy</div>
+                                        <div class="stat-value" style="font-size: 0.95em; color: #555;">${rec.description}</div>
+                                    </div>
+                                    <div class="stat">
+                                        <div class="stat-label">Rationale</div>
+                                        <div style="color: #777; font-size: 0.9em;">${rec.rationale}</div>
+                                    </div>
+                                    <div class="stat">
+                                        <div class="stat-label">Expected Impact</div>
+                                        <div style="color: #667eea; font-weight: 600;">${rec.expected_impact}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += '</div></div>';
+            }
+
+            // Festival Promotions
+            if (recs.festival_promotions && recs.festival_promotions.length > 0) {
+                html += '<div class="section">';
+                html += '<h2 class="section-title">🎉 Festival Promotions</h2>';
+                html += '<div class="grid">';
+
+                recs.festival_promotions.forEach((promo, index) => {
+                    const campaignClass = promo.campaign_intensity.toLowerCase();
+
+                    html += `
+                        <div class="card" style="animation-delay: ${index * 0.1}s">
+                            <div class="month">${promo.month}</div>
+                            <div class="festival-name">${promo.festival_name}</div>
+                            <div class="campaign-badge ${campaignClass}">${promo.campaign_intensity}</div>
+                            <div class="card-content">
+                                <div class="promotional-message">${promo.promotional_message}</div>
+                                <div style="margin: 15px 0;">
+                                    <div class="stat">
+                                        <div class="stat-label">Recommended Discount</div>
+                                        <div class="stat-value">${promo.recommended_discount}%</div>
+                                    </div>
+                                    <div class="stat">
+                                        <div class="stat-label">Stock Increase</div>
+                                        <div class="stat-value">${promo.stock_increase_percent}%</div>
+                                    </div>
+                                    <div class="stat">
+                                        <div class="stat-label">Expected Sales Lift</div>
+                                        <div class="stat-value">${promo.expected_sales_lift}%</div>
+                                    </div>
+                                    <div class="stat">
+                                        <div class="stat-label">Timing</div>
+                                        <div style="color: #777; font-size: 0.9em;">${promo.implementation_timing}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += '</div></div>';
+            }
+
+            container.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <h2>⚠️ Stores Needing Improvement</h2>
+        {% if low_stores %}
+        <table>
+          <thead>
+            <tr>
+              <th>Store ID</th>
+              <th>Avg Sales</th>
+              <th>Min Sales</th>
+              <th>Max Sales</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for store in low_stores %}
+            <tr>
+              <td><strong>{{ store.Store }}</strong></td>
+              <td>${{ "{:,.0f}".format(store.Avg_Sales) }}</td>
+              <td>${{ "{:,.0f}".format(store.Min_Sales) }}</td>
+              <td>${{ "{:,.0f}".format(store.Max_Sales) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p>No data available.</p>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <h2>💡 Strategic Insights</h2>
+        <ul style="line-height: 1.8;">
+          <li>Focus marketing resources on underperforming stores</li>
+          <li>Analyze successful strategies from top-performing stores</li>
+          <li>Use forecasts for inventory optimization</li>
+          <li>Monitor seasonal trends for better planning</li>
+        </ul>
+      </div>
+    </div>
+  </body>
+</html>

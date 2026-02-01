@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Seasonal Sales Forecasting</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+      .dashboard-welcome {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        padding: 2.5rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+      }
+
+      .dashboard-welcome h1 {
+        font-size: 2.2rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .dashboard-welcome p {
+        font-size: 1.1rem;
+        opacity: 0.95;
+        margin: 0;
+      }
+
+      .action-buttons {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin: 2rem 0;
+      }
+
+      .action-btn {
+        background: white;
+        border: none;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        font-size: 1rem;
+        font-weight: 600;
+        color: #2c3e50;
+      }
+
+      .action-btn:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 24px rgba(102, 126, 234, 0.3);
+      }
+
+      .action-btn.upload {
+        border-left: 4px solid #4CAF50;
+      }
+
+      .action-btn.upload:hover {
+        background: linear-gradient(135deg, #4CAF50, #45a049);
+        color: white;
+      }
+
+      .action-btn.analyze {
+        border-left: 4px solid #2196F3;
+      }
+
+      .action-btn.analyze:hover {
+        background: linear-gradient(135deg, #2196F3, #0b7dda);
+        color: white;
+      }
+
+      .action-btn.forecast {
+        border-left: 4px solid #FF9800;
+      }
+
+      .action-btn.forecast:hover {
+        background: linear-gradient(135deg, #FF9800, #e68900);
+        color: white;
+      }
+
+      .action-btn.recommendations {
+        border-left: 4px solid #9C27B0;
+      }
+
+      .action-btn.recommendations:hover {
+        background: linear-gradient(135deg, #9C27B0, #7b1fa2);
+        color: white;
+      }
+
+      .action-btn .icon {
+        font-size: 2.5rem;
+      }
+
+      .action-btn .label {
+        font-size: 1.1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>📊 Seasonal Sales Forecasting</h1>
+      <ul class="nav-links">
+        <li><a href="/upload">Upload</a></li>
+        <li><a href="/analysis">Analysis</a></li>
+        <li><a href="/forecast">Forecast</a></li>
+        <li><a href="/recommendation">Recommendations</a></li>
+        <li><a href="/logout">Logout</a></li>
+      </ul>
+    </header>
+
+    <div class="container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <ul class="flashes">
+          {% for category, message in messages %}
+            <li class="{{ category }}">{{ message }}</li>
+          {% endfor %}
+          </ul>
+        {% endif %}
+      {% endwith %}
+
+      <div class="dashboard-welcome">
+        <h1>Welcome, {{ session.username }}! 👋</h1>
+        <p>Your Supermarket Sales Intelligence Dashboard</p>
+      </div>
+
+      <div class="action-buttons">
+        <a href="/upload" class="action-btn upload">
+          <div class="icon">📤</div>
+          <div class="label">Upload Data</div>
+        </a>
+        <a href="/analysis" class="action-btn analyze">
+          <div class="icon">📈</div>
+          <div class="label">Analyze Sales</div>
+        </a>
+        <a href="/forecast" class="action-btn forecast">
+          <div class="icon">🔮</div>
+          <div class="label">Forecast Sales</div>
+        </a>
+        <a href="/recommendation" class="action-btn recommendations">
+          <div class="icon">💡</div>
+          <div class="label">View Recommendations</div>
+        </a>
+      </div>
+
+      {% if stats %}
+      <div class="card">
+        <h2>📊 Key Statistics</h2>
+        <div class="dashboard-grid">
+          <div class="stat-card">
+            <h3>Total Stores</h3>
+            <div class="value">{{ stats.total_stores }}</div>
+          </div>
+          <div class="stat-card">
+            <h3>Total Records</h3>
+            <div class="value">{{ "{:,}".format(stats.total_records) }}</div>
+          </div>
+          <div class="stat-card">
+            <h3>Avg Weekly Sales</h3>
+            <div class="value">${{ "{:,.0f}".format(stats.avg_sales) }}</div>
+          </div>
+          <div class="stat-card">
+            <h3>Max Weekly Sales</h3>
+            <div class="value">${{ "{:,.0f}".format(stats.max_sales) }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📋 Dataset Information</h2>
+        <table>
+          <tr>
+            <td><strong>Data Source:</strong></td>
+            <td>{{ stats.data_source }}</td>
+          </tr>
+          <tr>
+            <td><strong>Date Range:</strong></td>
+            <td>{{ stats.date_range }}</td>
+          </tr>
+          <tr>
+            <td><strong>Total Weeks:</strong></td>
+            <td>{{ stats.total_weeks }}</td>
+          </tr>
+          <tr>
+            <td><strong>Minimum Weekly Sales:</strong></td>
+            <td>${{ "{:,.0f}".format(stats.min_sales) }}</td>
+          </tr>
+          <tr>
+            <td><strong>Standard Deviation:</strong></td>
+            <td>${{ "{:,.0f}".format(stats.std_sales) }}</td>
+          </tr>
+          <tr>
+            <td><strong>Records Processed:</strong></td>
+            <td>{{ "{:,}".format(stats.total_records) }}</td>
+          </tr>
+        </table>
+      </div>
+
+      {% if preprocessing_stats %}
+      <div class="card">
+        <h2>🔧 Data Preprocessing Summary</h2>
+        <table>
+          <tr>
+            <td><strong>Records After Preprocessing:</strong></td>
+            <td>{{ "{:,}".format(preprocessing_stats.records_after_preprocessing|default(0)) }}</td>
+          </tr>
+          <tr>
+            <td><strong>Missing Values Remaining:</strong></td>
+            <td>{{ preprocessing_stats.missing_values_remaining|default(0) }}</td>
+          </tr>
+          <tr>
+            <td><strong>Duplicates Removed:</strong></td>
+            <td>{{ preprocessing_stats.duplicates_removed|default(0) }}</td>
+          </tr>
+          <tr>
+            <td><strong>Data Quality Status:</strong></td>
+            <td>{{ preprocessing_stats.data_quality_status|default('Unknown') }}</td>
+          </tr>
+          <tr>
+            <td><strong>Temporal Features Extracted:</strong></td>
+            <td>{{ preprocessing_stats.temporal_features_extracted|default(0) }}</td>
+          </tr>
+        </table>
+      </div>
+      {% endif %}
+
+      <div class="card">
+        <h2>💾 Data Storage Status</h2>
+        <table>
+          <tr>
+            <td><strong>Status:</strong></td>
+            <td><span style="color: #4CAF50; font-weight: bold;">✅ Data Stored in Database</span></td>
+          </tr>
+          <tr>
+            <td><strong>Access Level:</strong></td>
+            <td>Private (User-specific data)</td>
+          </tr>
+          <tr>
+            <td><strong>Database Location:</strong></td>
+            <td>SQLite (database/sales.db)</td>
+          </tr>
+          <tr>
+            <td><strong>Last Updated:</strong></td>
+            <td id="last_update">Loading...</td>
+          </tr>
+        </table>
+      </div>
+
+      {% if stores %}
+      <div class="card">
+        <h2>🏪 Top 10 Store Performance</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Store ID</th>
+              <th>Avg Sales</th>
+              <th>Min Sales</th>
+              <th>Max Sales</th>
+              <th>Std Dev</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for store in stores[:10] %}
+            <tr>
+              <td><strong>{{ store.Store }}</strong></td>
+              <td>${{ "{:,.0f}".format(store.Avg_Sales) }}</td>
+              <td>${{ "{:,.0f}".format(store.Min_Sales) }}</td>
+              <td>${{ "{:,.0f}".format(store.Max_Sales) }}</td>
+              <td>${{ "{:,.0f}".format(store.Std_Sales) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p style="margin-top: 1rem; color: #666;"><em>📍 Showing first 10 stores. Visit <strong>Analyze Sales</strong> for detailed insights on all stores.</em></p>
+      </div>
+      {% endif %}
+      {% else %}
+      <div class="card" style="background: #fff3cd; border-left: 4px solid #ffc107;">
+        <h2>⚠️ Dataset Not Available</h2>
+        <p>The dataset could not be loaded. Please ensure the Walmart-dataset.csv file exists in the data folder, or <a href="/upload">upload your data here</a>.</p>
+      </div>
+      {% endif %}
+    </div>
+  </body>
+  <script>
+    // Fetch and display user data storage summary
+    fetch('/api/user-data-summary')
+      .then(response => response.json())
+      .then(data => {
+        const lastUpdateEl = document.getElementById('last_update');
+        if (lastUpdateEl && data.records_stored > 0) {
+          const now = new Date();
+          lastUpdateEl.textContent = now.toLocaleString();
+        }
+      })
+      .catch(error => console.log('Data storage summary not available'));
+  </script>
+</html>

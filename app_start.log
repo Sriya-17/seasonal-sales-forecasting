@@ -1,0 +1,19 @@
+✅ Sales database initialized
+Uploaded data validation failed: Unable to parse any dates from the Date column. Sample values: ['# Add uploaded sales data here']. Please provide dates in common formats (e.g. DD-MM-YYYY, YYYY-MM-DD, DD/MM/YYYY).
+Removed 6292 duplicate records
+✅ Data loaded successfully from walmart dataset (143 records)
+📊 Preprocessing: 6292 records removed, 0 missing values remain
+ * Serving Flask app 'app' (lazy loading)
+ * Environment: development
+ * Debug mode: on
+Traceback (most recent call last):
+  File "/Users/sriyakaadhuluri/Documents/B.Tech/3rd_year/3-2/DEA/DEA-Project-1/seasonal_sales_forecasting/app.py", line 841, in <module>
+    app.run(debug=True)
+    ~~~~~~~^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/flask/app.py", line 922, in run
+    run_simple(t.cast(str, host), port, self, **options)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/werkzeug/serving.py", line 982, in run_simple
+    s.bind(server_address)
+    ~~~~~~^^^^^^^^^^^^^^^^
+OSError: [Errno 48] Address already in use

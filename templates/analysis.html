@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis - Seasonal Sales Forecasting</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+      .eda-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+        margin: 2rem 0;
+      }
+      
+      .chart-wrapper {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      }
+      
+      .full-width {
+        grid-column: 1 / -1;
+      }
+      
+      .eda-tabs {
+        display: flex;
+        gap: 1rem;
+        margin: 2rem 0;
+        flex-wrap: wrap;
+      }
+      
+      .tab-btn {
+        padding: 0.8rem 1.5rem;
+        border: none;
+        background: #f0f0f0;
+        cursor: pointer;
+        border-radius: 4px;
+        font-weight: 600;
+        transition: all 0.3s;
+      }
+      
+      .tab-btn.active {
+        background: #667eea;
+        color: white;
+      }
+      
+      .tab-content {
+        display: none;
+      }
+      
+      .tab-content.active {
+        display: block;
+      }
+      
+      .stat-box {
+        background: #f9f9f9;
+        padding: 1rem;
+        border-radius: 4px;
+        text-align: center;
+        margin: 0.5rem 0;
+      }
+      
+      .stat-box strong {
+        display: block;
+        font-size: 1.2rem;
+        color: #667eea;
+        margin-top: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>📊 Seasonal Sales Forecasting</h1>
+      <ul class="nav-links">
+        <li><a href="/dashboard">Dashboard</a></li>
+        <li><a href="/forecast">Forecast</a></li>
+        <li><a href="/recommendation">Recommendations</a></li>
+        <li><a href="/logout">Logout</a></li>
+      </ul>
+    </header>
+
+    <div class="container">
+      <div class="card">
+        <h1>📈 Exploratory Data Analysis (EDA)</h1>
+        <p>Comprehensive analysis of historical sales trends, seasonal patterns, and store performance.</p>
+      </div>
+
+      <!-- EDA Tabs -->
+      <div class="eda-tabs">
+        <button class="tab-btn active" onclick="switchTab('overview')">📊 Overview</button>
+        <button class="tab-btn" onclick="switchTab('trends')">📉 Trends</button>
+        <button class="tab-btn" onclick="switchTab('seasonal')">🌡️ Seasonal</button>
+        <button class="tab-btn" onclick="switchTab('peak')">⛰️ Peak/Low</button>
+        <button class="tab-btn" onclick="switchTab('stores')">🏪 Store Analysis</button>
+        <button class="tab-btn" onclick="switchTab('store-lookup')">🔍 Store Lookup</button>
+        <button class="tab-btn" onclick="switchTab('visualizations')">🎨 Visualizations</button>
+      </div>
+
+      <!-- Overview Tab -->
+      <div id="overview" class="tab-content active">
+        <div class="card">
+          <h2>📊 Overall Statistics</h2>
+          <div id="overall-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+            <div class="stat-box">
+              <span>Total Sales</span>
+              <strong id="total-sales">-</strong>
+            </div>
+            <div class="stat-box">
+              <span>Avg Weekly Sales</span>
+              <strong id="avg-sales">-</strong>
+            </div>
+            <div class="stat-box">
+              <span>Total Records</span>
+              <strong id="total-records">-</strong>
+            </div>
+            <div class="stat-box">
+              <span>Total Stores</span>
+              <strong id="total-stores">-</strong>
+            </div>
+            <div class="stat-box">
+              <span>Min Sales</span>
+              <strong id="min-sales">-</strong>
+            </div>
+            <div class="stat-box">
+              <span>Max Sales</span>
+              <strong id="max-sales">-</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trends Tab -->
+      <div id="trends" class="tab-content">
+        <div class="chart-wrapper full-width">
+          <h2>📉 Monthly Sales Trends</h2>
+          <canvas id="monthly-trends-chart"></canvas>
+        </div>
+        <div class="chart-wrapper full-width">
+          <h2>📅 Year-over-Year Analysis</h2>
+          <canvas id="yearly-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- Seasonal Tab -->
+      <div id="seasonal" class="tab-content">
+        <div class="chart-wrapper">
+          <h2>🌡️ Seasonal Sales Patterns</h2>
+          <canvas id="seasonal-chart"></canvas>
+        </div>
+        <div class="chart-wrapper">
+          <h2>🔄 Day of Week Analysis</h2>
+          <canvas id="dayofweek-chart"></canvas>
+        </div>
+        <div class="card full-width" style="margin-top: 1rem;">
+          <h3>Seasonality Strength</h3>
+          <p>Measures how much sales vary across different seasons (0-100%).</p>
+          <div class="stat-box">
+            <strong id="seasonality-strength">-</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Peak/Low Tab -->
+      <div id="peak" class="tab-content">
+        <div class="chart-wrapper">
+          <h2>⛰️ Peak Demand Periods (Top 5)</h2>
+          <canvas id="peak-periods-chart"></canvas>
+        </div>
+        <div class="chart-wrapper">
+          <h2>📉 Low Demand Periods (Bottom 5)</h2>
+          <canvas id="low-periods-chart"></canvas>
+        </div>
+        <div class="card full-width" style="margin-top: 1rem;">
+          <h3>Demand Comparison</h3>
+          <table>
+            <tr>
+              <td><strong>Peak Average Sales:</strong></td>
+              <td id="peak-avg">-</td>
+            </tr>
+            <tr>
+              <td><strong>Low Average Sales:</strong></td>
+              <td id="low-avg">-</td>
+            </tr>
+            <tr>
+              <td><strong>Difference:</strong></td>
+              <td id="demand-diff">-</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Store Analysis Tab -->
+      <div id="stores" class="tab-content">
+        <div class="chart-wrapper">
+          <h2>🏆 Top 10 Performing Stores</h2>
+          <canvas id="top-stores-chart"></canvas>
+        </div>
+        <div class="chart-wrapper">
+          <h2>📉 Bottom 10 Stores</h2>
+          <canvas id="bottom-stores-chart"></canvas>
+        </div>
+        <div class="card full-width" style="margin-top: 1rem;">
+          <h3>Store Performance Summary</h3>
+          <table>
+            <tr>
+              <td><strong>Best Performing Store:</strong></td>
+              <td id="best-store">-</td>
+            </tr>
+            <tr>
+              <td><strong>Best Store Avg Sales:</strong></td>
+              <td id="best-store-sales">-</td>
+            </tr>
+            <tr>
+              <td><strong>Overall Avg Store Sales:</strong></td>
+              <td id="avg-store-sales">-</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Store Lookup Tab -->
+      <div id="store-lookup" class="tab-content">
+        <div class="card">
+          <label for="store-select">Select Store:</label>
+          <select id="store-select" style="margin: 1rem 0; width: 200px; padding: 0.5rem;">
+            <option value="">-- Choose a Store --</option>
+            {% for store in stores %}
+            <option value="{{ store }}">Store {{ store }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="chart-wrapper full-width">
+          <canvas id="sales-chart"></canvas>
+        </div>
+
+        <div class="card" id="store-stats" style="display: none;">
+          <h2>📊 Store Statistics</h2>
+          <table>
+            <tr>
+              <td><strong>Store ID:</strong></td>
+              <td id="store-id">-</td>
+            </tr>
+            <tr>
+              <td><strong>Records:</strong></td>
+              <td id="store-records">-</td>
+            </tr>
+            <tr>
+              <td><strong>Average Sales:</strong></td>
+              <td id="store-avg">-</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Visualizations Tab (STEP 10) -->
+      <div id="visualizations" class="tab-content">
+        <div class="card" style="margin-bottom: 2rem;">
+          <h2>🎨 Data Visualizations</h2>
+          <p style="color: #666;">Interactive visualizations generated from real-time data analysis</p>
+        </div>
+
+        <!-- Sales Over Time -->
+        <div class="chart-wrapper full-width" style="margin-bottom: 2rem;">
+          <h3>📈 Sales Over Time</h3>
+          <div style="text-align: center; min-height: 300px; display: flex; align-items: center; justify-content: center;">
+            <img id="viz-sales-over-time" src="" style="max-width: 100%; max-height: 400px; display: none;" />
+            <div id="viz-sales-over-time-loading" style="text-align: center;">⏳ Loading visualization...</div>
+          </div>
+        </div>
+
+        <!-- Monthly Seasonality -->
+        <div class="chart-wrapper full-width" style="margin-bottom: 2rem;">
+          <h3>📊 Monthly Seasonality Patterns</h3>
+          <div style="text-align: center; min-height: 300px; display: flex; align-items: center; justify-content: center;">
+            <img id="viz-seasonality" src="" style="max-width: 100%; max-height: 400px; display: none;" />
+            <div id="viz-seasonality-loading" style="text-align: center;">⏳ Loading visualization...</div>
+          </div>
+        </div>
+
+        <!-- Seasonal Breakdown -->
+        <div class="chart-wrapper full-width" style="margin-bottom: 2rem;">
+          <h3>🌍 Seasonal Breakdown Analysis</h3>
+          <div style="text-align: center; min-height: 300px; display: flex; align-items: center; justify-content: center;">
+            <img id="viz-seasonal-breakdown" src="" style="max-width: 100%; max-height: 400px; display: none;" />
+            <div id="viz-seasonal-breakdown-loading" style="text-align: center;">⏳ Loading visualization...</div>
+          </div>
+        </div>
+
+        <!-- Store Performance -->
+        <div class="chart-wrapper full-width" style="margin-bottom: 2rem;">
+          <h3>🏪 Store Performance Analysis</h3>
+          <div style="text-align: center; min-height: 300px; display: flex; align-items: center; justify-content: center;">
+            <img id="viz-store-performance" src="" style="max-width: 100%; max-height: 400px; display: none;" />
+            <div id="viz-store-performance-loading" style="text-align: center;">⏳ Loading visualization...</div>
+          </div>
+        </div>
+
+        <!-- Yearly Comparison -->
+        <div class="chart-wrapper full-width" style="margin-bottom: 2rem;">
+          <h3>📅 Year-over-Year Comparison</h3>
+          <div style="text-align: center; min-height: 300px; display: flex; align-items: center; justify-content: center;">
+            <img id="viz-yearly-comparison" src="" style="max-width: 100%; max-height: 400px; display: none;" />
+            <div id="viz-yearly-comparison-loading" style="text-align: center;">⏳ Loading visualization...</div>
+          </div>
+        </div>
+
+        <!-- Sales Distribution -->
+        <div class="chart-wrapper full-width">
+          <h3>📉 Sales Distribution</h3>
+          <div style="text-align: center; min-height: 300px; display: flex; align-items: center; justify-content: center;">
+            <img id="viz-distribution" src="" style="max-width: 100%; max-height: 400px; display: none;" />
+            <div id="viz-distribution-loading" style="text-align: center;">⏳ Loading visualization...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let monthlyChart = null;
+      let yearlyChart = null;
+      let seasonalChart = null;
+      let dayofweekChart = null;
+      let peakChart = null;
+      let lowChart = null;
+      let topStoresChart = null;
+      let bottomStoresChart = null;
+      let storeChart = null;
+
+      // Tab switching
+      function switchTab(tabName) {
+        // Hide all tabs
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        
+        // Show selected tab
+        document.getElementById(tabName).classList.add('active');
+        event.target.classList.add('active');
+        
+        // Load data when switching to specific tabs
+        if (tabName === 'trends' && !monthlyChart) loadTrendsData();
+        if (tabName === 'seasonal' && !seasonalChart) loadSeasonalData();
+        if (tabName === 'peak' && !peakChart) loadPeakData();
+        if (tabName === 'stores' && !topStoresChart) loadStoreAnalysis();
+        if (tabName === 'visualizations') loadVisualizations();
+        if (tabName === 'overview') loadOverviewData();
+      }
+
+      // Load overview statistics
+      function loadOverviewData() {
+        fetch('/api/eda-summary')
+          .then(res => res.json())
+          .then(data => {
+            if (data.status === 'success') {
+              const stats = data.overall_stats;
+              document.getElementById('total-sales').textContent = '$' + Math.round(stats.total_sales).toLocaleString();
+              document.getElementById('avg-sales').textContent = '$' + Math.round(stats.avg_weekly_sales).toLocaleString();
+              document.getElementById('total-records').textContent = stats.total_records.toLocaleString();
+              document.getElementById('total-stores').textContent = stats.total_stores;
+              document.getElementById('min-sales').textContent = '$' + Math.round(stats.min_sales).toLocaleString();
+              document.getElementById('max-sales').textContent = '$' + Math.round(stats.max_sales).toLocaleString();
+            }
+          });
+      }
+
+      // Load trends data
+      function loadTrendsData() {
+        fetch('/api/monthly-trends')
+          .then(res => res.json())
+          .then(data => {
+            // Monthly trends chart
+            const ctx1 = document.getElementById('monthly-trends-chart').getContext('2d');
+            monthlyChart = new Chart(ctx1, {
+              type: 'line',
+              data: {
+                labels: data.months,
+                datasets: [{
+                  label: 'Total Monthly Sales',
+                  data: data.total_sales,
+                  borderColor: '#667eea',
+                  backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                  borderWidth: 2,
+                  fill: true,
+                  tension: 0.4
+                }]
+              },
+              options: {
+                responsive: true,
+                plugins: { legend: { display: true } },
+                scales: { y: { beginAtZero: true } }
+              }
+            });
+          });
+
+        fetch('/api/eda-summary')
+          .then(res => res.json())
+          .then(data => {
+            const yearData = data.year_analysis;
+            const ctx2 = document.getElementById('yearly-chart').getContext('2d');
+            yearlyChart = new Chart(ctx2, {
+              type: 'bar',
+              data: {
+                labels: yearData.years,
+                datasets: [{
+                  label: 'Annual Total Sales',
+                  data: yearData.total_sales,
+                  backgroundColor: '#667eea',
+                  borderColor: '#667eea',
+                  borderWidth: 1
+                }]
+              },
+              options: {
+                responsive: true,
+                plugins: { legend: { display: true } },
+                scales: { y: { beginAtZero: true } }
+              }
+            });
+          });
+      }
+
+      // Load seasonal data
+      function loadSeasonalData() {
+        fetch('/api/seasonal-patterns')
+          .then(res => res.json())
+          .then(data => {
+            // Seasonal chart
+            const ctx1 = document.getElementById('seasonal-chart').getContext('2d');
+            seasonalChart = new Chart(ctx1, {
+              type: 'doughnut',
+              data: {
+                labels: data.seasons,
+                datasets: [{
+                  data: data.avg_sales,
+                  backgroundColor: ['#667eea', '#764ba2', '#f093fb', '#4facfe']
+                }]
+              },
+              options: {
+                responsive: true,
+                plugins: { legend: { display: true } }
+              }
+            });
+
+            document.getElementById('seasonality-strength').textContent = data.seasonality_strength + '%';
+          });
+
+        fetch('/api/eda-summary')
+          .then(res => res.json())
+          .then(data => {
+            const dayData = data.day_of_week;
+            const ctx2 = document.getElementById('dayofweek-chart').getContext('2d');
+            dayofweekChart = new Chart(ctx2, {
+              type: 'bar',
+              data: {
+                labels: dayData.days,
+                datasets: [{
+                  label: 'Average Sales by Day',
+                  data: dayData.avg_sales,
+                  backgroundColor: '#764ba2'
+                }]
+              },
+              options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true } }
+              }
+            });
+          });
+      }
+
+      // Load peak/low periods
+      function loadPeakData() {
+        fetch('/api/peak-periods')
+          .then(res => res.json())
+          .then(data => {
+            // Peak chart
+            const ctx1 = document.getElementById('peak-periods-chart').getContext('2d');
+            peakChart = new Chart(ctx1, {
+              type: 'bar',
+              data: {
+                labels: data.peak_periods,
+                datasets: [{
+                  label: 'Peak Period Sales',
+                  data: data.peak_sales,
+                  backgroundColor: '#4CAF50'
+                }]
+              },
+              options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true } }
+              }
+            });
+
+            // Low chart
+            const ctx2 = document.getElementById('low-periods-chart').getContext('2d');
+            lowChart = new Chart(ctx2, {
+              type: 'bar',
+              data: {
+                labels: data.low_periods,
+                datasets: [{
+                  label: 'Low Period Sales',
+                  data: data.low_sales,
+                  backgroundColor: '#FF9800'
+                }]
+              },
+              options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true } }
+              }
+            });
+
+            document.getElementById('peak-avg').textContent = '$' + Math.round(data.peak_average).toLocaleString();
+            document.getElementById('low-avg').textContent = '$' + Math.round(data.low_average).toLocaleString();
+            const diff = data.peak_average - data.low_average;
+            const pctDiff = (diff / data.low_average * 100).toFixed(1);
+            document.getElementById('demand-diff').textContent = '$' + Math.round(diff).toLocaleString() + ' (' + pctDiff + '%)';
+          });
+      }
+
+      // Load store analysis
+      function loadStoreAnalysis() {
+        fetch('/api/store-performance')
+          .then(res => res.json())
+          .then(data => {
+            // Top stores chart
+            const topLabels = data.top_stores.map(s => 'Store ' + s.store);
+            const topSales = data.top_stores.map(s => s.avg_sales);
+            
+            const ctx1 = document.getElementById('top-stores-chart').getContext('2d');
+            topStoresChart = new Chart(ctx1, {
+              type: 'bar',
+              data: {
+                labels: topLabels,
+                datasets: [{
+                  label: 'Avg Sales',
+                  data: topSales,
+                  backgroundColor: '#4CAF50'
+                }]
+              },
+              options: {
+                responsive: true,
+                indexAxis: 'y',
+                scales: { x: { beginAtZero: true } }
+              }
+            });
+
+            // Bottom stores chart
+            const bottomLabels = data.bottom_stores.map(s => 'Store ' + s.store);
+            const bottomSales = data.bottom_stores.map(s => s.avg_sales);
+            
+            const ctx2 = document.getElementById('bottom-stores-chart').getContext('2d');
+            bottomStoresChart = new Chart(ctx2, {
+              type: 'bar',
+              data: {
+                labels: bottomLabels,
+                datasets: [{
+                  label: 'Avg Sales',
+                  data: bottomSales,
+                  backgroundColor: '#FF9800'
+                }]
+              },
+              options: {
+                responsive: true,
+                indexAxis: 'y',
+                scales: { x: { beginAtZero: true } }
+              }
+            });
+
+            document.getElementById('best-store').textContent = 'Store ' + data.best_performer;
+            document.getElementById('best-store-sales').textContent = '$' + Math.round(data.best_performer_sales).toLocaleString();
+            document.getElementById('avg-store-sales').textContent = '$' + Math.round(data.avg_store_sales).toLocaleString();
+          });
+      }
+
+      // Store lookup
+      document.getElementById('store-select').addEventListener('change', function() {
+        const storeId = this.value;
+        if (!storeId) return;
+
+        fetch(`/api/store-data/${storeId}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.error) {
+              alert('Error: ' + data.error);
+              return;
+            }
+
+            if (storeChart) storeChart.destroy();
+
+            const ctx = document.getElementById('sales-chart').getContext('2d');
+            storeChart = new Chart(ctx, {
+              type: 'line',
+              data: {
+                labels: data.dates,
+                datasets: [{
+                  label: `Store ${storeId} Weekly Sales`,
+                  data: data.sales,
+                  borderColor: '#667eea',
+                  backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                  borderWidth: 2,
+                  fill: true,
+                  tension: 0.4
+                }]
+              },
+              options: {
+                responsive: true,
+                plugins: { legend: { display: true } },
+                scales: { y: { beginAtZero: false } }
+              }
+            });
+
+            document.getElementById('store-id').textContent = data.store_id;
+            document.getElementById('store-records').textContent = data.records;
+            document.getElementById('store-avg').textContent = '$' + Math.round(data.avg_sales).toLocaleString('en-US', {maximumFractionDigits: 0});
+            document.getElementById('store-stats').style.display = 'block';
+          })
+          .catch(err => console.error('Error:', err));
+      });
+
+      // STEP 10: Load Visualizations
+      function loadVisualizations() {
+        const plots = [
+          { id: 'sales-over-time', endpoint: '/api/plot/sales-over-time' },
+          { id: 'seasonality', endpoint: '/api/plot/seasonality' },
+          { id: 'seasonal-breakdown', endpoint: '/api/plot/seasonal-breakdown' },
+          { id: 'store-performance', endpoint: '/api/plot/store-performance' },
+          { id: 'yearly-comparison', endpoint: '/api/plot/yearly-comparison' },
+          { id: 'distribution', endpoint: '/api/plot/distribution' }
+        ];
+
+        plots.forEach(plot => {
+          fetch(plot.endpoint)
+            .then(res => res.json())
+            .then(data => {
+              if (data.plot) {
+                const img = document.getElementById(`viz-${plot.id}`);
+                const loading = document.getElementById(`viz-${plot.id}-loading`);
+                
+                img.src = 'data:image/png;base64,' + data.plot;
+                img.style.display = 'block';
+                if (loading) loading.style.display = 'none';
+              } else {
+                console.error(`Failed to load plot ${plot.id}`);
+              }
+            })
+            .catch(err => {
+              console.error(`Error loading ${plot.id}:`, err);
+              const loading = document.getElementById(`viz-${plot.id}-loading`);
+              if (loading) loading.textContent = '❌ Failed to load visualization';
+            });
+        });
+      }
+
+      // Load overview on page load
+      document.addEventListener('DOMContentLoaded', loadOverviewData);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forecast - Seasonal Sales Forecasting</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/result_display.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        .forecast-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: var(--card-shadow);
+        }
+        
+        .forecast-header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: white;
+        }
+        
+        .forecast-header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin: 0;
+        }
+        
+        .forecast-controls {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: var(--card-shadow);
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .forecast-controls label {
+            font-weight: 600;
+            color: var(--dark-bg);
+        }
+        
+        .forecast-controls select,
+        .forecast-controls input {
+            padding: 0.75rem;
+            border: 2px solid var(--light-bg);
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+        
+        .forecast-controls select:focus,
+        .forecast-controls input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .forecast-controls button {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .forecast-controls button:hover {
+            background: var(--secondary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .metric-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            border-left: 4px solid var(--primary-color);
+            transition: var(--transition);
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .metric-label {
+            font-size: 0.85rem;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+        
+        .metric-subtitle {
+            font-size: 0.9rem;
+            color: #999;
+        }
+        
+        .chart-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 2rem;
+        }
+        
+        .chart-title {
+            font-size: 1.3rem;
+            color: var(--dark-bg);
+            margin-bottom: 1rem;
+            font-weight: 700;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 0.5rem;
+        }
+        
+        .chart-wrapper {
+            position: relative;
+            height: 400px;
+            margin-bottom: 1rem;
+        }
+        
+        .forecast-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .forecast-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            border-top: 4px solid var(--primary-color);
+            transition: var(--transition);
+        }
+        
+        .forecast-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .forecast-period {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--dark-bg);
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .forecast-values {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+        
+        .forecast-value-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem;
+            background: var(--light-bg);
+            border-radius: 4px;
+        }
+        
+        .forecast-value-label {
+            font-weight: 600;
+            color: var(--dark-bg);
+        }
+        
+        .forecast-value-amount {
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+        
+        .confidence-badge {
+            display: inline-block;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: rgba(102, 126, 234, 0.1);
+            color: var(--primary-color);
+        }
+        
+        .insights-section {
+            background: var(--light-bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border-left: 4px solid var(--success-color);
+        }
+        
+        .insight-item {
+            padding: 0.8rem 0;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .insight-item:last-child {
+            border-bottom: none;
+        }
+        
+        .insight-item strong {
+            color: var(--primary-color);
+            display: block;
+            margin-bottom: 0.3rem;
+        }
+        
+        .alert-box {
+            background: rgba(245, 158, 11, 0.1);
+            border-left: 4px solid var(--warning-color);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            color: var(--warning-color);
+        }
+        
+        .alert-box strong {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--light-bg);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📊 Seasonal Sales Forecasting</h1>
+        <ul class="nav-links">
+            <li><a href="/dashboard">Dashboard</a></li>
+            <li><a href="/analysis">Analysis</a></li>
+            <li><a href="/recommendation">Recommendations</a></li>
+            <li><a href="/logout">Logout</a></li>
+        </ul>
+    </header>
+
+    <div class="container">
+        <!-- Forecast Header -->
+        <div class="forecast-header">
+            <h1>📈 Sales Forecast</h1>
+            <p>Advanced forecasting for next 12 months with ARIMA analysis and seasonal decomposition</p>
+        </div>
+
+        <!-- Forecast Controls -->
+        <div class="forecast-controls">
+            <label for="forecastStore">Select Store:</label>
+            <select id="forecastStore">
+                <option value="">All Stores (Aggregated)</option>
+            </select>
+
+            <label for="forecastHorizon">Forecast Horizon:</label>
+            <select id="forecastHorizon">
+                <option value="3">3 Months</option>
+                <option value="6">6 Months</option>
+                <option value="12" selected>12 Months</option>
+            </select>
+
+            <button onclick="generateForecast()">📊 Generate Forecast</button>
+            <button onclick="downloadForecast()">⬇️ Download</button>
+        </div>
+
+        <!-- Key Metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">Next 3 Months Avg</div>
+                <div class="metric-value" id="next3MonthsAvg">$0</div>
+                <div class="metric-subtitle">Average forecast</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label">Next 12 Months Total</div>
+                <div class="metric-value" id="next12MonthsTotal">$0</div>
+                <div class="metric-subtitle">Total forecasted sales</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label">Confidence Level</div>
+                <div class="metric-value" id="confidenceLevel">95%</div>
+                <div class="metric-subtitle">Model confidence</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label">Trend Direction</div>
+                <div class="metric-value" id="trendDirection">📈 Upward</div>
+                <div class="metric-subtitle">Overall trend</div>
+            </div>
+        </div>
+
+        <!-- Key Insights -->
+        <div class="card">
+            <h2>📌 Key Insights from Forecast</h2>
+            <div class="insights-section">
+                <div class="insight-item">
+                    <strong>📊 Forecast Summary</strong>
+                    <p>The ARIMA model predicts <span id="forecastSummary">loading...</span> across the forecast period.</p>
+                </div>
+                <div class="insight-item">
+                    <strong>🎯 Peak Season</strong>
+                    <p>Expect highest sales in <span id="peakMonth">loading...</span> with potential <span id="peakIncrease">50%</span> increase.</p>
+                </div>
+                <div class="insight-item">
+                    <strong>💡 Recommendation</strong>
+                    <p id="forecastRecommendation">Prepare inventory and marketing strategies based on predicted seasonal patterns.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Forecast Chart -->
+        <div class="chart-container">
+            <h3 class="chart-title">📊 Sales Forecast vs Historical Data</h3>
+            <div class="chart-wrapper">
+                <canvas id="forecastChart"></canvas>
+            </div>
+            <p>This chart shows historical sales data with the 12-month forecast. The shaded area represents the confidence interval.</p>
+        </div>
+
+        <!-- Seasonal Decomposition -->
+        <div class="chart-container">
+            <h3 class="chart-title">🔄 Seasonal Decomposition</h3>
+            <div class="chart-wrapper">
+                <canvas id="seasonalDecomposition"></canvas>
+            </div>
+            <p>Decomposition of sales into trend, seasonal, and residual components.</p>
+        </div>
+
+        <!-- Forecast Cards -->
+        <div class="card">
+            <h2>Monthly Forecast Details</h2>
+            <p>Detailed forecast for each month of the forecast period:</p>
+        </div>
+
+        <div class="forecast-cards" id="forecastCardsContainer">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading forecast data...</p>
+            </div>
+        </div>
+
+        <!-- Scenario Analysis -->
+        <div class="chart-container">
+            <h3 class="chart-title">📊 Scenario Analysis</h3>
+            <div class="chart-wrapper">
+                <canvas id="scenarioChart"></canvas>
+            </div>
+            <p>Comparison of different forecast scenarios: Optimistic, Base Case, and Pessimistic.</p>
+        </div>
+
+        <!-- Accuracy Metrics -->
+        <div class="card">
+            <h2>📈 Model Accuracy Metrics</h2>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+                <thead>
+                    <tr style="background: var(--light-bg); border-bottom: 2px solid var(--primary-color);">
+                        <th style="padding: 1rem; text-align: left;">Metric</th>
+                        <th style="padding: 1rem; text-align: left;">Value</th>
+                        <th style="padding: 1rem; text-align: left;">Interpretation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom: 1px solid var(--light-bg);">
+                        <td style="padding: 1rem;"><strong>RMSE</strong></td>
+                        <td style="padding: 1rem; color: var(--primary-color); font-weight: 700;" id="rmseValue">0.00</td>
+                        <td style="padding: 1rem; color: #666;">Root Mean Square Error - lower is better</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--light-bg);">
+                        <td style="padding: 1rem;"><strong>MAE</strong></td>
+                        <td style="padding: 1rem; color: var(--primary-color); font-weight: 700;" id="maeValue">0.00</td>
+                        <td style="padding: 1rem; color: #666;">Mean Absolute Error - average error magnitude</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 1rem;"><strong>MAPE</strong></td>
+                        <td style="padding: 1rem; color: var(--primary-color); font-weight: 700;" id="mapeValue">0.00%</td>
+                        <td style="padding: 1rem; color: #666;">Mean Absolute Percentage Error - error percentage</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let forecastCharts = {};
+        let forecastData = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadForecast();
+            loadStoreList();
+        });
+
+        function loadForecast() {
+            fetch('/api/forecast')
+                .then(response => response.json())
+                .then(data => {
+                    forecastData = data;
+                    updateForecastMetrics(data);
+                    initializeForecastCharts(data);
+                    updateForecastCards(data);
+                })
+                .catch(error => {
+                    console.error('Error loading forecast:', error);
+                    document.getElementById('forecastCardsContainer').innerHTML = 
+                        '<div style="grid-column: 1/-1; color: red; padding: 2rem; text-align: center;">Error loading forecast data</div>';
+                });
+        }
+
+        function loadStoreList() {
+            fetch('/api/analysis')
+                .then(response => response.json())
+                .then(data => {
+                    const select = document.getElementById('forecastStore');
+                    if (data.store_stats) {
+                        const options = Object.keys(data.store_stats).slice(0, 10).map(storeId => 
+                            `<option value="${storeId}">Store #${storeId}</option>`
+                        ).join('');
+                        select.innerHTML = '<option value="">All Stores (Aggregated)</option>' + options;
+                    }
+                })
+                .catch(error => console.error('Error loading stores:', error));
+        }
+
+        function updateForecastMetrics(data) {
+            if (data.forecast && data.forecast.length > 0) {
+                const forecast = data.forecast.slice(0, 12);
+                const next3 = forecast.slice(0, 3).reduce((sum, f) => sum + (f.forecast || 0), 0) / 3;
+                const total12 = forecast.reduce((sum, f) => sum + (f.forecast || 0), 0);
+
+                document.getElementById('next3MonthsAvg').textContent = '$' + next3.toFixed(0);
+                document.getElementById('next12MonthsTotal').textContent = '$' + total12.toFixed(0);
+                document.getElementById('forecastSummary').textContent = 
+                    total12 > data.mean_sales * 12 ? 'positive growth' : 'stable performance';
+                document.getElementById('trendDirection').textContent = 
+                    total12 > data.mean_sales * 12 ? '📈 Upward' : '📉 Downward';
+            }
+        }
+
+        function updateForecastCards(data) {
+            if (!data.forecast) {
+                document.getElementById('forecastCardsContainer').innerHTML = 
+                    '<div class="data-not-loaded">No forecast data available</div>';
+                return;
+            }
+
+            const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+
+            document.getElementById('forecastCardsContainer').innerHTML = 
+                data.forecast.slice(0, 12).map((item, idx) => {
+                    const confLower = (item.forecast || 0) * 0.9;
+                    const confUpper = (item.forecast || 0) * 1.1;
+                    return `
+                        <div class="forecast-card">
+                            <div class="forecast-period">
+                                ${months[idx]}
+                                <span class="confidence-badge">95% CI</span>
+                            </div>
+                            <div class="forecast-values">
+                                <div class="forecast-value-row">
+                                    <span class="forecast-value-label">Forecast</span>
+                                    <span class="forecast-value-amount">$${(item.forecast || 0).toFixed(0)}</span>
+                                </div>
+                                <div class="forecast-value-row">
+                                    <span class="forecast-value-label">Lower Bound</span>
+                                    <span class="forecast-value-amount">$${confLower.toFixed(0)}</span>
+                                </div>
+                                <div class="forecast-value-row">
+                                    <span class="forecast-value-label">Upper Bound</span>
+                                    <span class="forecast-value-amount">$${confUpper.toFixed(0)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+        }
+
+        function initializeForecastCharts(data) {
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            
+            if (data.forecast && data.forecast.length > 0) {
+                const forecastValues = data.forecast.slice(0, 12).map(f => (f.forecast || 0).toFixed(0));
+                const forecastLabels = months.map((m, i) => `${m} ${new Date().getFullYear() + 1}`);
+
+                const ctx = document.getElementById('forecastChart').getContext('2d');
+                forecastCharts.main = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: forecastLabels,
+                        datasets: [{
+                            label: 'Forecasted Sales',
+                            data: forecastValues,
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            tension: 0.3,
+                            fill: true,
+                            pointBackgroundColor: '#667eea',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true },
+                            title: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { callback: function(value) { return '$' + value; } }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Scenario Analysis Chart
+            if (data.forecast && data.forecast.length > 0) {
+                const baseCase = data.forecast.slice(0, 12).map(f => (f.forecast || 0).toFixed(0));
+                const optimistic = baseCase.map(v => (v * 1.2).toFixed(0));
+                const pessimistic = baseCase.map(v => (v * 0.8).toFixed(0));
+                const labels = months;
+
+                const scenarioCtx = document.getElementById('scenarioChart').getContext('2d');
+                forecastCharts.scenario = new Chart(scenarioCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Optimistic',
+                                data: optimistic,
+                                borderColor: '#10b981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                                tension: 0.3,
+                                borderDash: [5, 5]
+                            },
+                            {
+                                label: 'Base Case',
+                                data: baseCase,
+                                borderColor: '#667eea',
+                                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                                tension: 0.3,
+                                fill: true
+                            },
+                            {
+                                label: 'Pessimistic',
+                                data: pessimistic,
+                                borderColor: '#ef4444',
+                                backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                                tension: 0.3,
+                                borderDash: [5, 5]
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: true } },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { callback: function(value) { return '$' + value; } }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function generateForecast() {
+            const store = document.getElementById('forecastStore').value;
+            const horizon = document.getElementById('forecastHorizon').value;
+            
+            fetch(`/api/forecast/generate?store=${store}&horizon=${horizon}`)
+                .then(response => response.json())
+                .then(data => {
+                    forecastData = data;
+                    updateForecastMetrics(data);
+                    Object.values(forecastCharts).forEach(chart => chart.destroy());
+                    forecastCharts = {};
+                    initializeForecastCharts(data);
+                    updateForecastCards(data);
+                })
+                .catch(error => console.error('Error generating forecast:', error));
+        }
+
+        function downloadForecast() {
+            if (!forecastData || !forecastData.forecast) {
+                alert('No forecast data to download');
+                return;
+            }
+
+            let csv = 'Month,Forecast,Lower Bound,Upper Bound\n';
+            forecastData.forecast.slice(0, 12).forEach((item, idx) => {
+                const lower = (item.forecast || 0) * 0.9;
+                const upper = (item.forecast || 0) * 1.1;
+                csv += `Month ${idx + 1},${item.forecast},${lower.toFixed(0)},${upper.toFixed(0)}\n`;
+            });
+
+            const element = document.createElement('a');
+            element.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv));
+            element.setAttribute('download', 'forecast.csv');
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+    </script>
+</body>
+</html>

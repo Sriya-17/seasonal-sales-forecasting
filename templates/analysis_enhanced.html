@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis - Seasonal Sales Forecasting</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/result_display.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        .analysis-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: var(--card-shadow);
+        }
+        
+        .analysis-header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: white;
+        }
+        
+        .analysis-header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin: 0;
+        }
+        
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .metric-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            border-left: 4px solid var(--primary-color);
+            transition: var(--transition);
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .metric-label {
+            font-size: 0.85rem;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+        
+        .metric-subtitle {
+            font-size: 0.9rem;
+            color: #999;
+        }
+        
+        .chart-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 2rem;
+        }
+        
+        .chart-title {
+            font-size: 1.3rem;
+            color: var(--dark-bg);
+            margin-bottom: 1rem;
+            font-weight: 700;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 0.5rem;
+        }
+        
+        .chart-wrapper {
+            position: relative;
+            height: 400px;
+            margin-bottom: 1rem;
+        }
+        
+        .insights-section {
+            background: var(--light-bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border-left: 4px solid var(--success-color);
+        }
+        
+        .insight-item {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .insight-item:last-child {
+            border-bottom: none;
+        }
+        
+        .insight-item strong {
+            color: var(--primary-color);
+            display: block;
+            margin-bottom: 0.3rem;
+        }
+        
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .stats-table th {
+            background: var(--light-bg);
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--dark-bg);
+            border-bottom: 2px solid var(--primary-color);
+        }
+        
+        .stats-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--light-bg);
+        }
+        
+        .stats-table tr:hover {
+            background: var(--light-bg);
+        }
+        
+        .stats-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            border-bottom: 2px solid var(--light-bg);
+        }
+        
+        .tab-btn {
+            padding: 1rem 1.5rem;
+            border: none;
+            background: transparent;
+            color: #666;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            border-bottom: 3px solid transparent;
+            transition: var(--transition);
+            margin-bottom: -2px;
+        }
+        
+        .tab-btn:hover {
+            color: var(--primary-color);
+            background: var(--light-bg);
+        }
+        
+        .tab-btn.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+        
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .store-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        
+        .store-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            border-top: 3px solid var(--primary-color);
+        }
+        
+        .store-name {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--dark-bg);
+            margin-bottom: 1rem;
+        }
+        
+        .store-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .store-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem;
+            background: var(--light-bg);
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .store-stat strong {
+            color: var(--dark-bg);
+        }
+        
+        .store-value {
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--light-bg);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .data-not-loaded {
+            background: var(--light-bg);
+            padding: 2rem;
+            text-align: center;
+            border-radius: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📊 Seasonal Sales Forecasting</h1>
+        <ul class="nav-links">
+            <li><a href="/dashboard">Dashboard</a></li>
+            <li><a href="/forecast">Forecast</a></li>
+            <li><a href="/recommendation">Recommendations</a></li>
+            <li><a href="/logout">Logout</a></li>
+        </ul>
+    </header>
+
+    <div class="container">
+        <!-- Analysis Header -->
+        <div class="analysis-header">
+            <h1>📈 Exploratory Data Analysis</h1>
+            <p>Comprehensive analysis of historical sales trends, seasonal patterns, and store performance</p>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('overview')">📊 Overview</button>
+            <button class="tab-btn" onclick="switchTab('trends')">📉 Trends</button>
+            <button class="tab-btn" onclick="switchTab('seasonal')">🌡️ Seasonal</button>
+            <button class="tab-btn" onclick="switchTab('peak')">⛰️ Peak/Low</button>
+            <button class="tab-btn" onclick="switchTab('stores')">🏪 Store Analysis</button>
+            <button class="tab-btn" onclick="switchTab('store-lookup')">🔍 Store Lookup</button>
+            <button class="tab-btn" onclick="switchTab('visualizations')">🎨 Visualizations</button>
+        </div>
+
+        <!-- OVERVIEW TAB -->
+        <div id="overview" class="tab-content active">
+            <div class="overview-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Total Records</div>
+                    <div class="metric-value" id="totalRecords">0</div>
+                    <div class="metric-subtitle">Data points analyzed</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-label">Total Sales</div>
+                    <div class="metric-value" id="totalSales">$0</div>
+                    <div class="metric-subtitle">Sum of all sales</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-label">Average Sales</div>
+                    <div class="metric-value" id="avgSales">$0</div>
+                    <div class="metric-subtitle">Mean sales value</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-label">Highest Sale</div>
+                    <div class="metric-value" id="maxSales">$0</div>
+                    <div class="metric-subtitle">Peak sale amount</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-label">Lowest Sale</div>
+                    <div class="metric-value" id="minSales">$0</div>
+                    <div class="metric-subtitle">Minimum sale amount</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-label">Standard Deviation</div>
+                    <div class="metric-value" id="stdSales">$0</div>
+                    <div class="metric-subtitle">Sales variability</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Key Insights</h2>
+                <div class="insights-section">
+                    <div class="insight-item">
+                        <strong>📊 Data Coverage</strong>
+                        The dataset contains <span id="recordsCount">loading...</span> records spanning multiple stores and time periods.
+                    </div>
+                    <div class="insight-item">
+                        <strong>💰 Sales Range</strong>
+                        Sales vary significantly from <span id="minRange">$0</span> to <span id="maxRange">$0</span>, indicating varied performance across different scenarios.
+                    </div>
+                    <div class="insight-item">
+                        <strong>📈 Variability</strong>
+                        The standard deviation of <span id="stdRange">0</span> shows <span id="volatilityDesc">moderate</span> volatility in sales data.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TRENDS TAB -->
+        <div id="trends" class="tab-content">
+            <div class="chart-container">
+                <h3 class="chart-title">📉 Sales Trends Over Time</h3>
+                <div class="chart-wrapper">
+                    <canvas id="trendsChart"></canvas>
+                </div>
+                <p>This chart shows the overall sales trend across the time period. It helps identify if sales are generally increasing, decreasing, or remaining stable.</p>
+            </div>
+
+            <div class="card">
+                <h2>Trend Analysis</h2>
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>Time Period</th>
+                            <th>Average Sales</th>
+                            <th>Trend Direction</th>
+                            <th>Change %</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trendsTable">
+                        <tr>
+                            <td colspan="4" class="text-center">Loading trend data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- SEASONAL TAB -->
+        <div id="seasonal" class="tab-content">
+            <div class="chart-container">
+                <h3 class="chart-title">🌡️ Seasonal Patterns</h3>
+                <div class="chart-wrapper">
+                    <canvas id="seasonalChart"></canvas>
+                </div>
+                <p>This visualization shows how sales vary by season, helping identify peak and low seasons.</p>
+            </div>
+
+            <div class="card">
+                <h2>Monthly Performance</h2>
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Average Sales</th>
+                            <th>Performance Level</th>
+                            <th>Index</th>
+                        </tr>
+                    </thead>
+                    <tbody id="seasonalTable">
+                        <tr>
+                            <td colspan="4" class="text-center">Loading seasonal data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- PEAK/LOW TAB -->
+        <div id="peak" class="tab-content">
+            <div class="chart-container">
+                <h3 class="chart-title">⛰️ Peak vs Low Sales Analysis</h3>
+                <div class="chart-wrapper">
+                    <canvas id="peakChart"></canvas>
+                </div>
+                <p>Comparison of peak and low sales periods to identify business cycles and opportunities.</p>
+            </div>
+
+            <div class="card">
+                <h2>Peak and Low Periods</h2>
+                <div class="overview-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Peak Season Sales</div>
+                        <div class="metric-value" id="peakSales">$0</div>
+                        <div class="metric-subtitle">Highest performing period</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-label">Low Season Sales</div>
+                        <div class="metric-value" id="lowSales">$0</div>
+                        <div class="metric-subtitle">Lowest performing period</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-label">Peak/Low Ratio</div>
+                        <div class="metric-value" id="peakLowRatio">0x</div>
+                        <div class="metric-subtitle">Seasonality strength</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STORE ANALYSIS TAB -->
+        <div id="stores" class="tab-content">
+            <div class="card">
+                <h2>Store Performance Comparison</h2>
+                <p>Compare sales performance across different stores to identify top performers and areas for improvement.</p>
+            </div>
+
+            <div class="store-grid" id="storesContainer">
+                <div class="data-not-loaded">
+                    <div class="spinner"></div>
+                    <p>Loading store data...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- STORE LOOKUP TAB -->
+        <div id="store-lookup" class="tab-content">
+            <div class="card">
+                <h2>Store Specific Analysis</h2>
+                <p>Search for a specific store to view detailed performance metrics.</p>
+                
+                <div style="margin: 2rem 0;">
+                    <label for="storeSelect" style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Select a Store:</label>
+                    <select id="storeSelect" onchange="loadStoreDetails()" style="padding: 0.75rem; border: 2px solid #ddd; border-radius: 8px; font-size: 1rem; width: 100%; max-width: 300px;">
+                        <option value="">Loading stores...</option>
+                    </select>
+                </div>
+
+                <div id="storeDetailsContainer" style="margin-top: 2rem;"></div>
+            </div>
+        </div>
+
+        <!-- VISUALIZATIONS TAB -->
+        <div id="visualizations" class="tab-content">
+            <div class="chart-container">
+                <h3 class="chart-title">📊 Distribution Analysis</h3>
+                <div class="chart-wrapper">
+                    <canvas id="distributionChart"></canvas>
+                </div>
+                <p>This histogram shows the distribution of sales values, revealing the pattern of sales across all records.</p>
+            </div>
+
+            <div class="chart-container">
+                <h3 class="chart-title">🏪 Store Sales Comparison</h3>
+                <div class="chart-wrapper">
+                    <canvas id="storeComparisonChart"></canvas>
+                </div>
+                <p>Comparison of average sales performance across all stores.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables for chart instances
+        let charts = {};
+        let allData = null;
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAnalysisData();
+        });
+
+        // Load analysis data
+        function loadAnalysisData() {
+            fetch('/api/analysis')
+                .then(response => response.json())
+                .then(data => {
+                    allData = data;
+                    updateOverview(data);
+                    updateTrends(data);
+                    updateSeasonal(data);
+                    updatePeakLow(data);
+                    updateStores(data);
+                    initializeCharts(data);
+                })
+                .catch(error => {
+                    console.error('Error loading analysis data:', error);
+                    document.querySelectorAll('.data-not-loaded').forEach(el => {
+                        el.innerHTML = '<p style="color: red;">Error loading data. Please refresh.</p>';
+                    });
+                });
+        }
+
+        // Update Overview Tab
+        function updateOverview(data) {
+            document.getElementById('totalRecords').textContent = data.total_records?.toLocaleString() || '0';
+            document.getElementById('totalSales').textContent = '$' + (data.total_sales || 0).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            document.getElementById('avgSales').textContent = '$' + (data.mean_sales || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            document.getElementById('maxSales').textContent = '$' + (data.max_sales || 0).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            document.getElementById('minSales').textContent = '$' + (data.min_sales || 0).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            document.getElementById('stdSales').textContent = '$' + (data.std_sales || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            
+            // Update insights
+            document.getElementById('recordsCount').textContent = data.total_records?.toLocaleString() || '0';
+            document.getElementById('minRange').textContent = '$' + (data.min_sales || 0).toFixed(0);
+            document.getElementById('maxRange').textContent = '$' + (data.max_sales || 0).toFixed(0);
+            document.getElementById('stdRange').textContent = '$' + (data.std_sales || 0).toFixed(2);
+            
+            const volatility = (data.std_sales || 0) / (data.mean_sales || 1);
+            document.getElementById('volatilityDesc').textContent = volatility > 0.5 ? 'high' : 'moderate';
+        }
+
+        // Update Trends Tab
+        function updateTrends(data) {
+            // This would be populated by actual trends data from backend
+            const trendsTable = document.getElementById('trendsTable');
+            if (data.trends && data.trends.length > 0) {
+                trendsTable.innerHTML = data.trends.map((trend, idx) => `
+                    <tr>
+                        <td>${trend.period || 'Period ' + (idx + 1)}</td>
+                        <td>$${(trend.avg_sales || 0).toFixed(2)}</td>
+                        <td>${trend.direction || '→'}</td>
+                        <td>${(trend.change_pct || 0).toFixed(1)}%</td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        // Update Seasonal Tab
+        function updateSeasonal(data) {
+            const seasonalTable = document.getElementById('seasonalTable');
+            if (data.monthly_stats && Object.keys(data.monthly_stats).length > 0) {
+                seasonalTable.innerHTML = Object.entries(data.monthly_stats).map(([month, stats]) => {
+                    const avgSales = stats.avg || 0;
+                    const performance = avgSales > (data.mean_sales || 0) ? '📈 Strong' : '📉 Weak';
+                    return `
+                        <tr>
+                            <td><strong>${month}</strong></td>
+                            <td>$${avgSales.toFixed(0)}</td>
+                            <td>${performance}</td>
+                            <td>${(avgSales / (data.mean_sales || 1)).toFixed(2)}x</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        // Update Peak/Low Tab
+        function updatePeakLow(data) {
+            const peakSales = data.max_sales || 0;
+            const lowSales = data.min_sales || 0;
+            const ratio = lowSales > 0 ? (peakSales / lowSales).toFixed(2) : '0';
+            
+            document.getElementById('peakSales').textContent = '$' + peakSales.toFixed(0);
+            document.getElementById('lowSales').textContent = '$' + lowSales.toFixed(0);
+            document.getElementById('peakLowRatio').textContent = ratio + 'x';
+        }
+
+        // Update Stores Tab
+        function updateStores(data) {
+            const container = document.getElementById('storesContainer');
+            if (data.store_stats && Object.keys(data.store_stats).length > 0) {
+                container.innerHTML = Object.entries(data.store_stats).slice(0, 12).map(([storeId, stats]) => `
+                    <div class="store-card">
+                        <div class="store-name">Store #${storeId}</div>
+                        <div class="store-stats">
+                            <div class="store-stat">
+                                <strong>Avg Sales:</strong>
+                                <span class="store-value">$${(stats.avg || 0).toFixed(0)}</span>
+                            </div>
+                            <div class="store-stat">
+                                <strong>Max Sales:</strong>
+                                <span class="store-value">$${(stats.max || 0).toFixed(0)}</span>
+                            </div>
+                            <div class="store-stat">
+                                <strong>Min Sales:</strong>
+                                <span class="store-value">$${(stats.min || 0).toFixed(0)}</span>
+                            </div>
+                            <div class="store-stat">
+                                <strong>Total Sales:</strong>
+                                <span class="store-value">$${(stats.sum || 0).toFixed(0)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Populate store select
+                const storeSelect = document.getElementById('storeSelect');
+                storeSelect.innerHTML = '<option value="">Select a store...</option>' + 
+                    Object.keys(data.store_stats).map(storeId => `
+                        <option value="${storeId}">Store #${storeId}</option>
+                    `).join('');
+            }
+        }
+
+        // Initialize Charts
+        function initializeCharts(data) {
+            // Trends Chart
+            if (data.monthly_stats) {
+                const months = Object.keys(data.monthly_stats);
+                const avgSales = months.map(m => (data.monthly_stats[m].avg || 0).toFixed(0));
+                
+                const trendsCtx = document.getElementById('trendsChart').getContext('2d');
+                charts.trends = new Chart(trendsCtx, {
+                    type: 'line',
+                    data: {
+                        labels: months,
+                        datasets: [{
+                            label: 'Average Sales',
+                            data: avgSales,
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            tension: 0.3,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: true } }
+                    }
+                });
+            }
+
+            // Seasonal Chart
+            if (data.monthly_stats) {
+                const months = Object.keys(data.monthly_stats);
+                const avgSales = months.map(m => (data.monthly_stats[m].avg || 0).toFixed(0));
+                
+                const seasonalCtx = document.getElementById('seasonalChart').getContext('2d');
+                charts.seasonal = new Chart(seasonalCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: months,
+                        datasets: [{
+                            label: 'Average Sales',
+                            data: avgSales,
+                            backgroundColor: '#764ba2',
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+
+            // Peak Chart
+            if (data.monthly_stats) {
+                const months = Object.keys(data.monthly_stats);
+                const maxSales = months.map(m => (data.monthly_stats[m].max || 0).toFixed(0));
+                const minSales = months.map(m => (data.monthly_stats[m].min || 0).toFixed(0));
+                
+                const peakCtx = document.getElementById('peakChart').getContext('2d');
+                charts.peak = new Chart(peakCtx, {
+                    type: 'radar',
+                    data: {
+                        labels: months,
+                        datasets: [
+                            {
+                                label: 'Peak Sales',
+                                data: maxSales,
+                                borderColor: '#10b981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.1)'
+                            },
+                            {
+                                label: 'Low Sales',
+                                data: minSales,
+                                borderColor: '#ef4444',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: true } }
+                    }
+                });
+            }
+
+            // Store Comparison Chart
+            if (data.store_stats) {
+                const storeIds = Object.keys(data.store_stats).slice(0, 10);
+                const avgSales = storeIds.map(id => (data.store_stats[id].avg || 0).toFixed(0));
+                
+                const storeCtx = document.getElementById('storeComparisonChart').getContext('2d');
+                charts.storeComparison = new Chart(storeCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: storeIds.map(id => 'Store #' + id),
+                        datasets: [{
+                            label: 'Average Sales',
+                            data: avgSales,
+                            backgroundColor: [
+                                '#667eea', '#764ba2', '#10b981', '#f59e0b', '#ef4444',
+                                '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'
+                            ],
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+        }
+
+        // Tab switching function
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Remove active class from all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+
+            // Add active class to clicked button
+            event.target.classList.add('active');
+
+            // Trigger chart resize for better rendering
+            setTimeout(() => {
+                Object.values(charts).forEach(chart => {
+                    if (chart) chart.resize();
+                });
+            }, 100);
+        }
+
+        // Load store details
+        function loadStoreDetails() {
+            const storeId = document.getElementById('storeSelect').value;
+            const container = document.getElementById('storeDetailsContainer');
+
+            if (!storeId || !allData || !allData.store_stats[storeId]) {
+                container.innerHTML = '<p class="data-not-loaded">Select a store to view details.</p>';
+                return;
+            }
+
+            const stats = allData.store_stats[storeId];
+            container.innerHTML = `
+                <div class="card">
+                    <h3>Store #${storeId} Performance</h3>
+                    <div class="overview-grid">
+                        <div class="metric-card">
+                            <div class="metric-label">Average Sales</div>
+                            <div class="metric-value">$${(stats.avg || 0).toFixed(0)}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Maximum Sales</div>
+                            <div class="metric-value">$${(stats.max || 0).toFixed(0)}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Minimum Sales</div>
+                            <div class="metric-value">$${(stats.min || 0).toFixed(0)}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Total Sales</div>
+                            <div class="metric-value">$${(stats.sum || 0).toFixed(0)}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
