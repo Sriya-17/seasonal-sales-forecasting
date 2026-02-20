@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Seasonal Sales Forecasting</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .welcome-hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4rem 2rem;
+            border-radius: 20px;
+            text-align: center;
+            margin-bottom: 3rem;
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .welcome-hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 800;
+        }
+
+        .welcome-hero p {
+            font-size: 1.15rem;
+            opacity: 0.95;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .workflow-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 3rem 0;
+        }
+
+        .step-card {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            border: 2px solid #f0f0f0;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .step-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+            transform-origin: left;
+        }
+
+        .step-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 25px rgba(102, 126, 234, 0.2);
+            border-color: #667eea;
+        }
+
+        .step-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .step-number {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin: 0 auto 1rem;
+        }
+
+        .step-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 0.75rem;
+        }
+
+        .step-description {
+            color: #666;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .action-btn {
+            background: white;
+            border: 2px solid #e0e0e0;
+            padding: 2.5rem 1.75rem;
+            border-radius: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #2c3e50;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .action-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(102, 126, 234, 0.1), rgba(127, 63, 152, 0.1));
+            transition: left 0.3s ease;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-8px);
+            border-color: #667eea;
+            box-shadow: 0 12px 25px rgba(102, 126, 234, 0.2);
+        }
+
+        .action-btn:hover::before {
+            left: 100%;
+        }
+
+        .action-btn .icon {
+            font-size: 2.5rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .action-btn .text {
+            position: relative;
+            z-index: 1;
+        }
+
+        .action-btn.upload {
+            border-top: 4px solid #10b981;
+        }
+
+        .action-btn.analyze {
+            border-top: 4px solid #3b82f6;
+        }
+
+        .action-btn.forecast {
+            border-top: 4px solid #f59e0b;
+        }
+
+        .action-btn.recommendations {
+            border-top: 4px solid #ec4899;
+        }
+
+        .info-section {
+            background: linear-gradient(135deg, #f0f4ff 0%, #f9f5ff 100%);
+            border: 2px dashed #667eea;
+            border-radius: 16px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .info-section h3 {
+            color: #667eea;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .info-section ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .info-section li {
+            padding: 0.75rem 0 0.75rem 2rem;
+            color: #555;
+            position: relative;
+            line-height: 1.6;
+        }
+
+        .info-section li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #10b981;
+            font-weight: 800;
+            font-size: 1.2rem;
+        }
+
+        .quick-start {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            margin: 2rem 0;
+        }
+
+        .quick-start h3 {
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+            font-size: 1.3rem;
+        }
+
+        .quick-start-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .quick-start-item {
+            background: #f9f9f9;
+            padding: 1.5rem;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .quick-start-item h4 {
+            color: #667eea;
+            margin-bottom: 0.75rem;
+            font-size: 1rem;
+        }
+
+        .quick-start-item p {
+            color: #666;
+            font-size: 0.9rem;
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        .stats-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .stat-box {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #f0f0f0;
+            transition: all 0.3s ease;
+        }
+
+        .stat-box:hover {
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);
+            border-color: #667eea;
+        }
+
+        .stat-label {
+            color: #999;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            color: #667eea;
+            font-size: 1.8rem;
+            font-weight: 800;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📊 Sales Forecasting Hub</h1>
+        <ul class="nav-links">
+            <li><a href="/dashboard" class="active">Dashboard</a></li>
+            <li><a href="/upload">Upload</a></li>
+            <li><a href="/analysis">Analysis</a></li>
+            <li><a href="/forecast">Forecast</a></li>
+            <li><a href="/recommendation">Recommendations</a></li>
+            <li><a href="/logout">Logout</a></li>
+        </ul>
+    </header>
+
+    <div class="container">
+        <!-- Welcome Section -->
+        <div class="welcome-hero">
+            <h1>Welcome to Sales Forecasting! 🎯</h1>
+            <p>Analyze your sales data, identify seasonal patterns, predict future trends, and get actionable business recommendations - all in one place.</p>
+        </div>
+
+        <!-- Workflow Steps -->
+        <div style="margin: 3rem 0;">
+            <h2 style="text-align: center; color: #2c3e50; margin-bottom: 2rem;">How It Works</h2>
+            <div class="workflow-steps">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <div class="step-title">📤 Upload Data</div>
+                    <div class="step-description">Upload your sales CSV file to get started</div>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <div class="step-title">📊 Analyze</div>
+                    <div class="step-description">View sales trends, seasonal patterns, and insights</div>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <div class="step-title">🔮 Forecast</div>
+                    <div class="step-description">Get AI-powered predictions for future sales</div>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">4</div>
+                    <div class="step-title">💡 Recommendations</div>
+                    <div class="step-description">Receive actionable business strategies</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div style="margin: 3rem 0;">
+            <h2 style="text-align: center; color: #2c3e50; margin-bottom: 2rem;">Quick Actions</h2>
+            <div class="action-buttons">
+                <a href="/upload" class="action-btn upload">
+                    <div class="icon">📤</div>
+                    <div class="text">Upload Sales Data</div>
+                </a>
+                <a href="/analysis" class="action-btn analyze">
+                    <div class="icon">📊</div>
+                    <div class="text">View Analysis</div>
+                </a>
+                <a href="/forecast" class="action-btn forecast">
+                    <div class="icon">🔮</div>
+                    <div class="text">See Forecast</div>
+                </a>
+                <a href="/recommendation" class="action-btn recommendations">
+                    <div class="icon">💡</div>
+                    <div class="text">Get Recommendations</div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Info Section -->
+        <div class="info-section">
+            <h3>📚 Getting Started</h3>
+            <ul>
+                <li>Your CSV file should contain columns: Date, Sales, and Store ID</li>
+                <li>Upload at least 6 months of historical sales data for accurate analysis</li>
+                <li>All data is processed securely and stored in your account</li>
+                <li>Get instant insights, visualizations, and predictions</li>
+                <li>Download reports and recommendations for your team</li>
+            </ul>
+        </div>
+
+        <!-- Quick Start Guide -->
+        <div class="quick-start">
+            <h3>⚡ Quick Start Guide</h3>
+            <div class="quick-start-grid">
+                <div class="quick-start-item">
+                    <h4>Step 1: Prepare Data</h4>
+                    <p>Organize your sales data in a CSV file with date, sales, and store columns</p>
+                </div>
+                <div class="quick-start-item">
+                    <h4>Step 2: Upload</h4>
+                    <p>Click "Upload Sales Data" and select your CSV file to begin</p>
+                </div>
+                <div class="quick-start-item">
+                    <h4>Step 3: Analyze</h4>
+                    <p>View sales trends, patterns, and seasonal insights instantly</p>
+                </div>
+                <div class="quick-start-item">
+                    <h4>Step 4: Forecast</h4>
+                    <p>Get predictions for next 3-12 months of sales</p>
+                </div>
+                <div class="quick-start-item">
+                    <h4>Step 5: Act</h4>
+                    <p>Implement recommendations for pricing, inventory, and promotions</p>
+                </div>
+                <div class="quick-start-item">
+                    <h4>Step 6: Track</h4>
+                    <p>Monitor results and refine strategies based on actual outcomes</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Features Overview -->
+        <div style="margin: 3rem 0;">
+            <h2 style="text-align: center; color: #2c3e50; margin-bottom: 2rem;">Key Features</h2>
+            <div class="stats-overview">
+                <div class="stat-box">
+                    <div class="stat-label">📈 Analytics</div>
+                    <div class="stat-value">Real-time</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">🎯 Predictions</div>
+                    <div class="stat-value">AI-Powered</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">💡 Recommendations</div>
+                    <div class="stat-value">Actionable</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">📊 Visualizations</div>
+                    <div class="stat-value">Interactive</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tips Section -->
+        <div style="background: linear-gradient(135deg, #fef3c7 0%, #fff8e1 100%); border-left: 5px solid #f59e0b; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; color: #92400e;">
+            <strong>💡 Tip:</strong> For best results, upload sales data spanning at least 24 months to capture full seasonal cycles and trend patterns.
+        </div>
+    </div>
+
+    <script>
+        // Add active class to current nav link
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            if (link.href === window.location.href) {
+                link.classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Data - Seasonal Sales Forecasting</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .upload-container {
+            max-width: 900px;
+            margin: 2rem auto;
+        }
+
+        .upload-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .upload-header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .upload-header p {
+            opacity: 0.92;
+            opacity: 0.95;
+        }
+
+        .upload-main {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        .upload-area-section {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .upload-zone {
+            border: 3px dashed #34495e;
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            background: linear-gradient(135deg, rgba(44, 62, 80, 0.02), rgba(52, 73, 94, 0.04));
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-zone:hover {
+            border-color: #2c3e50;
+            background: linear-gradient(135deg, rgba(44, 62, 80, 0.06), rgba(52, 73, 94, 0.08));
+            box-shadow: 0 4px 12px rgba(44, 62, 80, 0.1);
+        }
+
+        .upload-zone.dragover {
+            border-color: #2c3e50;
+            background: linear-gradient(135deg, rgba(44, 62, 80, 0.1), rgba(52, 73, 94, 0.12));
+            box-shadow: 0 8px 20px rgba(44, 62, 80, 0.15);
+        }
+
+        .upload-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .upload-zone h3 {
+            color: #2c3e50;
+            margin: 1rem 0 0.5rem 0;
+            font-size: 1.2rem;
+        }
+
+        .upload-zone p {
+            margin: 0.5rem 0;
+            color: #666;
+        }
+
+        .upload-zone .or-text {
+            color: #999;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .upload-zone .small-text {
+            color: #999;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .file-name {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #e8f5e9;
+            border: 2px solid #4caf50;
+            border-radius: 12px;
+            display: none;
+            color: #2e7d32;
+            font-weight: 600;
+        }
+
+        .file-name::before {
+            content: '✓ ';
+            color: #4caf50;
+            font-weight: 800;
+        }
+
+        .format-guide {
+            background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+            border-left: 5px solid #667eea;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+        }
+
+        .format-guide h3 {
+            color: #667eea;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .format-guide-item {
+            margin: 0.75rem 0;
+            color: #2c3e50;
+            font-size: 0.95rem;
+        }
+
+        .format-guide-item strong {
+            color: #667eea;
+            font-weight: 700;
+        }
+
+        .example-table {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 1rem 0;
+            border: 1px solid #e0e0e0;
+        }
+
+        .example-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .example-table th {
+            background: #667eea;
+            color: white;
+            padding: 0.75rem;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .example-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e0e0e0;
+            color: #555;
+        }
+
+        .example-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .requirements-section {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .requirements-section h3 {
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+            font-size: 1.2rem;
+        }
+
+        .requirement-item {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: #f9f9f9;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .requirement-item-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .requirement-item-content h4 {
+            color: #2c3e50;
+            margin-bottom: 0.25rem;
+            font-weight: 700;
+        }
+
+        .requirement-item-content p {
+            color: #666;
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        .submit-section {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .cancel-btn {
+            background: #e5e7eb;
+            color: #2c3e50;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .cancel-btn:hover {
+            background: #d1d5db;
+        }
+
+        .tips-section {
+            background: linear-gradient(135deg, #fef3c7 0%, #fff8e1 100%);
+            border: 2px dashed #f59e0b;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            color: #92400e;
+        }
+
+        .tips-section h4 {
+            color: #f59e0b;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        .tips-section ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .tips-section li {
+            padding: 0.5rem 0 0.5rem 1.75rem;
+            position: relative;
+            line-height: 1.5;
+        }
+
+        .tips-section li::before {
+            content: '💡';
+            position: absolute;
+            left: 0;
+        }
+
+        @media (max-width: 768px) {
+            .upload-main {
+                grid-template-columns: 1fr;
+            }
+
+            .upload-header h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📊 Sales Forecasting Hub</h1>
+        <ul class="nav-links">
+            <li><a href="/dashboard">Dashboard</a></li>
+            <li><a href="/upload" class="active">Upload</a></li>
+            <li><a href="/analysis">Analysis</a></li>
+            <li><a href="/forecast">Forecast</a></li>
+            <li><a href="/recommendation">Recommendations</a></li>
+            <li><a href="/logout">Logout</a></li>
+        </ul>
+    </header>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="upload-header">
+            <h1>📤 Upload Your Sales Data</h1>
+            <p>Get started by uploading your sales CSV file to begin your analysis journey</p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="upload-container">
+            <div class="upload-main">
+                <!-- Upload Section -->
+                <div class="upload-area-section">
+                    <form id="upload-form" action="/upload" method="POST" enctype="multipart/form-data">
+                        <div class="upload-zone" id="upload-zone">
+                            <div class="upload-icon">📁</div>
+                            <h3>Drag & Drop Your CSV File</h3>
+                            <p>or click to browse</p>
+                            <div class="or-text">OR</div>
+                            <button type="button" class="btn" onclick="document.getElementById('file-input').click()" style="background: linear-gradient(135deg, #667eea, #764ba2); margin-top: 0.5rem;">
+                                Select File
+                            </button>
+                            <input type="file" id="file-input" name="file" accept=".csv" required>
+                            <div class="small-text">Accepted format: CSV (.csv)</div>
+                            <div class="file-name" id="file-name"></div>
+                        </div>
+
+                        <div class="submit-section">
+                            <button type="submit" class="submit-btn" id="submit-btn" disabled>Upload & Analyze</button>
+                            <a href="/dashboard" class="cancel-btn">Cancel</a>
+                        </div>
+                    </form>
+
+                    <div class="tips-section">
+                        <h4>⚠️ Tips for Success</h4>
+                        <ul>
+                            <li>Use consistent date formats throughout your file</li>
+                            <li>Remove headers or ensure data starts from row 1</li>
+                            <li>Make sure all sales values are numeric</li>
+                            <li>Include at least 6-12 months of historical data</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Requirements Section -->
+                <div class="requirements-section">
+                    <h3>📋 Requirements</h3>
+
+                    <div class="format-guide">
+                        <h3>CSV Format</h3>
+                        <div class="format-guide-item">
+                            <strong>Required Columns:</strong> Date (mm/dd/yyyy), Sales (number), Store (ID)
+                        </div>
+                        <div class="example-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Sales</th>
+                                        <th>Store</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>01/05/2022</td>
+                                        <td>15000</td>
+                                        <td>1</td>
+                                    </tr>
+                                    <tr>
+                                        <td>01/06/2022</td>
+                                        <td>18500</td>
+                                        <td>1</td>
+                                    </tr>
+                                    <tr>
+                                        <td>01/07/2022</td>
+                                        <td>21000</td>
+                                        <td>2</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <h3 style="margin-top: 2rem; color: #2c3e50;">Checklist</h3>
+                    <div class="requirement-item">
+                        <div class="requirement-item-icon">✓</div>
+                        <div class="requirement-item-content">
+                            <h4>File Format</h4>
+                            <p>CSV format (.csv extension)</p>
+                        </div>
+                    </div>
+                    <div class="requirement-item">
+                        <div class="requirement-item-icon">✓</div>
+                        <div class="requirement-item-content">
+                            <h4>Data Completeness</h4>
+                            <p>At least 6-12 months of sales history</p>
+                        </div>
+                    </div>
+                    <div class="requirement-item">
+                        <div class="requirement-item-icon">✓</div>
+                        <div class="requirement-item-content">
+                            <h4>Column Names</h4>
+                            <p>Date, Sales, Store columns must be present</p>
+                        </div>
+                    </div>
+                    <div class="requirement-item">
+                        <div class="requirement-item-icon">✓</div>
+                        <div class="requirement-item-content">
+                            <h4>Data Quality</h4>
+                            <p>No missing values, consistent date format</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadZone = document.getElementById('upload-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileName = document.getElementById('file-name');
+        const submitBtn = document.getElementById('submit-btn');
+        const uploadForm = document.getElementById('upload-form');
+
+        // Drag and drop
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].name.endsWith('.csv')) {
+                fileInput.files = files;
+                updateFileName();
+            } else {
+                alert('Please drop a CSV file');
+            }
+        });
+
+        // File input change
+        fileInput.addEventListener('change', updateFileName);
+
+        function updateFileName() {
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                fileName.textContent = file.name;
+                fileName.style.display = 'block';
+                submitBtn.disabled = false;
+            } else {
+                fileName.style.display = 'none';
+                submitBtn.disabled = true;
+            }
+        }
+
+        // Form submission
+        uploadForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const formData = new FormData(uploadForm);
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Uploading...';
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.text())
+                .then(html => {
+                    document.body.innerHTML = html;
+                })
+                .catch(error => {
+                    alert('Error uploading file: ' + error);
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Upload & Analyze';
+                });
+        });
+
+        // Add active nav link
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            if (link.href === window.location.href) {
+                link.classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>

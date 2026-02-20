@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -521,10 +522,32 @@
 
         // Load analysis data
         function loadAnalysisData() {
+            console.log('Starting to load analysis data...');
             fetch('/api/analysis')
-                .then(response => response.json())
+                .then(response => {
+                    console.log('Response received:', response.status, response.statusText);
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('Analysis data received:', data);
                     allData = data;
+                    
+                    // Check if we got valid data
+                    if (!data || data.error) {
+                        console.error('API returned error:', data?.error || 'Unknown error');
+                        document.querySelectorAll('.data-not-loaded').forEach(el => {
+                            el.innerHTML = '<p style="color: red;">Error: ' + (data?.error || 'No data') + '</p>';
+                        });
+                        return;
+                    }
+                    
+                    console.log('Calling update functions with data:', {
+                        total_sales: data.total_sales,
+                        mean_sales: data.mean_sales,
+                        monthly_count: Object.keys(data.monthly_stats || {}).length,
+                        store_count: Object.keys(data.store_stats || {}).length
+                    });
+                    
                     updateOverview(data);
                     updateTrends(data);
                     updateSeasonal(data);
@@ -535,7 +558,7 @@
                 .catch(error => {
                     console.error('Error loading analysis data:', error);
                     document.querySelectorAll('.data-not-loaded').forEach(el => {
-                        el.innerHTML = '<p style="color: red;">Error loading data. Please refresh.</p>';
+                        el.innerHTML = '<p style="color: red;">Error loading data: ' + error.message + '</p>';
                     });
                 });
         }
@@ -821,5 +844,8 @@
             `;
         }
     </script>
+    <footer>
+      <p>&copy; 2026 <strong>Seasonal Sales Forecasting System</strong> - Powered by Advanced ARIMA Analytics | All Rights Reserved</p>
+    </footer>
 </body>
 </html>

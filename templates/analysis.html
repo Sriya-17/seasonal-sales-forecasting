@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
+      /* lightweight overrides for this page */
       .eda-container {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -16,7 +17,7 @@
       
       .chart-wrapper {
         background: white;
-        padding: 1.5rem;
+        padding: 1.5rem; 
         border-radius: 8px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       }
@@ -71,7 +72,25 @@
       }
     </style>
   </head>
+
+<div class="container" style="margin: 2rem 0; padding: 1rem; background: #f9f9f9; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+    <h2>📁 Upload Sales CSV</h2>
+    <form id="upload-form" action="/upload" method="POST" enctype="multipart/form-data">
+        <div id="upload-area" class="upload-area">
+            <p>Drag &amp; drop your CSV file here or click to select</p>
+            <input type="file" name="file" accept=".csv" required />
+        </div>
+        <button type="submit" class="btn" style="margin-top:1rem;">Upload</button>
+    </form>
+    <p style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">
+        Make sure your CSV has columns: <strong>store_id, sales, month</strong>
+    </p>
+</div>
+
+
+
   <body>
+    <div id="overlay" class="overlay" style="display:none;"><div class="spinner"></div></div>
     <header>
       <h1>📊 Seasonal Sales Forecasting</h1>
       <ul class="nav-links">
@@ -79,6 +98,7 @@
         <li><a href="/forecast">Forecast</a></li>
         <li><a href="/recommendation">Recommendations</a></li>
         <li><a href="/logout">Logout</a></li>
+        <li><button id="theme-toggle" class="btn-secondary" title="Toggle dark mode">🌙</button></li>
       </ul>
     </header>
 
@@ -224,8 +244,10 @@
       <!-- Store Lookup Tab -->
       <div id="store-lookup" class="tab-content">
         <div class="card">
+          <label for="store-search">Search Store:</label>
+          <input type="text" id="store-search" placeholder="Enter id or name" style="margin: 0.5rem 0; width: 200px; padding: 0.5rem;" />
           <label for="store-select">Select Store:</label>
-          <select id="store-select" style="margin: 1rem 0; width: 200px; padding: 0.5rem;">
+          <select id="store-select" style="margin: 0.5rem 0; width: 200px; padding: 0.5rem;">
             <option value="">-- Choose a Store --</option>
             {% for store in stores %}
             <option value="{{ store }}">Store {{ store }}</option>
@@ -351,7 +373,7 @@
 
       // Load overview statistics
       function loadOverviewData() {
-        fetch('/api/eda-summary')
+        fetchWithOverlay('/api/eda-summary')
           .then(res => res.json())
           .then(data => {
             if (data.status === 'success') {
@@ -368,7 +390,7 @@
 
       // Load trends data
       function loadTrendsData() {
-        fetch('/api/monthly-trends')
+        fetchWithOverlay('/api/monthly-trends')
           .then(res => res.json())
           .then(data => {
             // Monthly trends chart
@@ -395,7 +417,7 @@
             });
           });
 
-        fetch('/api/eda-summary')
+        fetchWithOverlay('/api/eda-summary')
           .then(res => res.json())
           .then(data => {
             const yearData = data.year_analysis;
@@ -423,7 +445,7 @@
 
       // Load seasonal data
       function loadSeasonalData() {
-        fetch('/api/seasonal-patterns')
+        fetchWithOverlay('/api/seasonal-patterns')
           .then(res => res.json())
           .then(data => {
             // Seasonal chart
@@ -446,7 +468,7 @@
             document.getElementById('seasonality-strength').textContent = data.seasonality_strength + '%';
           });
 
-        fetch('/api/eda-summary')
+        fetchWithOverlay('/api/eda-summary')
           .then(res => res.json())
           .then(data => {
             const dayData = data.day_of_week;
@@ -471,7 +493,7 @@
 
       // Load peak/low periods
       function loadPeakData() {
-        fetch('/api/peak-periods')
+        fetchWithOverlay('/api/peak-periods')
           .then(res => res.json())
           .then(data => {
             // Peak chart
@@ -520,7 +542,7 @@
 
       // Load store analysis
       function loadStoreAnalysis() {
-        fetch('/api/store-performance')
+        fetchWithOverlay('/api/store-performance')
           .then(res => res.json())
           .then(data => {
             // Top stores chart
@@ -578,7 +600,7 @@
         const storeId = this.value;
         if (!storeId) return;
 
-        fetch(`/api/store-data/${storeId}`)
+        fetchWithOverlay(`/api/store-data/${storeId}`)
           .then(res => res.json())
           .then(data => {
             if (data.error) {
@@ -652,8 +674,71 @@
         });
       }
 
-      // Load overview on page load
-      document.addEventListener('DOMContentLoaded', loadOverviewData);
+      // helper to show global overlay spinner
+      const overlay = document.getElementById('overlay');
+      function showOverlay() { if (overlay) overlay.style.display = 'flex'; }
+      function hideOverlay() { if (overlay) overlay.style.display = 'none'; }
+
+      // wrapper fetch with overlay
+      function fetchWithOverlay(url) {
+        showOverlay();
+        return fetch(url).finally(hideOverlay);
+      }
+
+      // theme toggle logic
+      const themeToggle = document.getElementById('theme-toggle');
+      function setTheme(mode) {
+        if (mode === 'dark') document.body.classList.add('dark-mode');
+        else document.body.classList.remove('dark-mode');
+        localStorage.setItem('theme', mode);
+        if (themeToggle) themeToggle.textContent = mode === 'dark' ? '☀️' : '🌙';
+      }
+      if (themeToggle) {
+        themeToggle.addEventListener('click', () => {
+          const isDark = document.body.classList.toggle('dark-mode');
+          setTheme(isDark ? 'dark' : 'light');
+        });
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const stored = localStorage.getItem('theme') || 'light';
+        setTheme(stored);
+        loadOverviewData();
+      });
+
+      // store search filtering
+      document.getElementById('store-search')?.addEventListener('input', function() {
+        const filter = this.value.trim().toLowerCase();
+        const select = document.getElementById('store-select');
+        Array.from(select.options).forEach(opt => {
+          opt.style.display = opt.text.toLowerCase().includes(filter) || opt.value === '' ? '' : 'none';
+        });
+      });
+
+      // drag/drop upload enhancements
+      const uploadArea = document.getElementById('upload-area');
+      if (uploadArea) {
+        const fileInput = uploadArea.querySelector('input[type=file]');
+        ['dragenter', 'dragover'].forEach(evt => {
+          uploadArea.addEventListener(evt, e => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+          });
+        });
+        ['dragleave', 'drop'].forEach(evt => {
+          uploadArea.addEventListener(evt, e => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+          });
+        });
+        uploadArea.addEventListener('drop', e => {
+          const files = e.dataTransfer.files;
+          if (files.length) fileInput.files = files;
+        });
+      }
     </script>
+    <footer>
+      <p>&copy; 2026 <strong>Seasonal Sales Forecasting System</strong> - Powered by Advanced ARIMA Analytics | All Rights Reserved</p>
+    </footer>
   </body>
 </html>

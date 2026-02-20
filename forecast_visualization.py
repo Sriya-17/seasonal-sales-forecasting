@@ -46,11 +46,13 @@ class ForecastVisualizer:
             if forecast_df is None:
                 return {'success': False, 'error': 'No forecast_df in result'}
             
-            # Ensure date column is proper datetime
-            if 'date' not in forecast_df.columns:
-                return {'success': False, 'error': 'No date column in forecast_df'}
-            
-            forecast_dates = pd.to_datetime(forecast_df['date']) if not isinstance(forecast_df['date'].iloc[0], (pd.Timestamp, type(pd.NaT))) else forecast_df['date']
+            # Get forecast dates - handle both 'date' column and DatetimeIndex
+            if 'date' in forecast_df.columns:
+                forecast_dates = pd.to_datetime(forecast_df['date'])
+            elif isinstance(forecast_df.index, pd.DatetimeIndex):
+                forecast_dates = forecast_df.index
+            else:
+                return {'success': False, 'error': 'Cannot determine forecast dates'}
             
             # Plot historical data
             ax.plot(ts.index, ts.values, 'b-', linewidth=2, label='Historical Sales', marker='o', markersize=4)
@@ -87,11 +89,16 @@ class ForecastVisualizer:
             plt.savefig(filepath, dpi=100, bbox_inches='tight')
             plt.close()
             
-            # Create chart data for JSON response
+            # Create chart data for JSON response - handle both date formats
+            if 'date' in forecast_df.columns:
+                forecast_dates_list = pd.to_datetime(forecast_df['date']).dt.strftime('%Y-%m-%d').tolist()
+            else:
+                forecast_dates_list = forecast_dates.strftime('%Y-%m-%d').tolist()
+            
             chart_data = {
                 'historical_dates': ts.index.strftime('%Y-%m-%d').tolist(),
                 'historical_values': ts.values.tolist(),
-                'forecast_dates': pd.to_datetime(forecast_df['date']).dt.strftime('%Y-%m-%d').tolist(),
+                'forecast_dates': forecast_dates_list,
                 'forecast_values': forecast_df['forecast'].tolist(),
                 'lower_ci': forecast_df['lower_ci'].tolist(),
                 'upper_ci': forecast_df['upper_ci'].tolist()
@@ -133,8 +140,13 @@ class ForecastVisualizer:
             if baseline_df is None:
                 return {'success': False, 'error': 'No baseline forecast_df'}
             
-            # Ensure dates are datetime
-            baseline_dates = pd.to_datetime(baseline_df['date']) if not isinstance(baseline_df['date'].iloc[0], (pd.Timestamp, type(pd.NaT))) else baseline_df['date']
+            # Get baseline dates - handle both 'date' column and DatetimeIndex
+            if 'date' in baseline_df.columns:
+                baseline_dates = pd.to_datetime(baseline_df['date'])
+            elif isinstance(baseline_df.index, pd.DatetimeIndex):
+                baseline_dates = baseline_df.index
+            else:
+                return {'success': False, 'error': 'Cannot determine baseline forecast dates'}
             
             # Plot baseline
             ax.plot(baseline_dates, baseline_df['forecast'], 'g-', 

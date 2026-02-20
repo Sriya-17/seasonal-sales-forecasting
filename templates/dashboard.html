@@ -5,42 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Seasonal Sales Forecasting</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
       .dashboard-welcome {
-        background: linear-gradient(135deg, #667eea, #764ba2);
+        background: linear-gradient(135deg, var(--primary), var(--accent));
         color: white;
-        padding: 2.5rem;
-        border-radius: 8px;
-        margin-bottom: 2rem;
-        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+        padding: 3rem 2.5rem;
+        border-radius: 16px;
+        margin-bottom: 2.5rem;
+        box-shadow: var(--shadow-lg);
       }
 
       .dashboard-welcome h1 {
-        font-size: 2.2rem;
+        font-size: 2.4rem;
         margin-bottom: 0.5rem;
+        font-weight: 800;
       }
 
       .dashboard-welcome p {
-        font-size: 1.1rem;
+        font-size: 1.15rem;
         opacity: 0.95;
         margin: 0;
       }
 
       .action-buttons {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
         gap: 1.5rem;
-        margin: 2rem 0;
+        margin: 2rem 0 3rem 0;
       }
 
       .action-btn {
         background: white;
         border: none;
-        padding: 2rem;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        padding: 2.5rem 2rem;
+        border-radius: 16px;
+        box-shadow: var(--shadow-md);
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: var(--transition);
         text-decoration: none;
         display: flex;
         flex-direction: column;
@@ -48,57 +50,261 @@
         justify-content: center;
         gap: 1rem;
         font-size: 1rem;
-        font-weight: 600;
-        color: #2c3e50;
+        font-weight: 700;
+        color: var(--secondary);
+        border-top: 4px solid transparent;
       }
 
       .action-btn:hover {
         transform: translateY(-8px);
-        box-shadow: 0 12px 24px rgba(102, 126, 234, 0.3);
+        box-shadow: var(--shadow-lg);
       }
 
       .action-btn.upload {
-        border-left: 4px solid #4CAF50;
+        border-top-color: var(--success);
+        background: linear-gradient(to bottom, rgba(16, 185, 129, 0.05), white);
       }
 
       .action-btn.upload:hover {
-        background: linear-gradient(135deg, #4CAF50, #45a049);
+        background: linear-gradient(135deg, var(--success), #059669);
         color: white;
       }
 
       .action-btn.analyze {
-        border-left: 4px solid #2196F3;
+        border-top-color: var(--info);
+        background: linear-gradient(to bottom, rgba(59, 130, 246, 0.05), white);
       }
 
       .action-btn.analyze:hover {
-        background: linear-gradient(135deg, #2196F3, #0b7dda);
+        background: linear-gradient(135deg, var(--info), #2563eb);
         color: white;
       }
 
       .action-btn.forecast {
-        border-left: 4px solid #FF9800;
+        border-top-color: var(--warning);
+        background: linear-gradient(to bottom, rgba(245, 158, 11, 0.05), white);
       }
 
       .action-btn.forecast:hover {
-        background: linear-gradient(135deg, #FF9800, #e68900);
+        background: linear-gradient(135deg, var(--warning), #d97706);
         color: white;
       }
 
       .action-btn.recommendations {
-        border-left: 4px solid #9C27B0;
+        border-top-color: var(--danger);
+        background: linear-gradient(to bottom, rgba(239, 68, 68, 0.05), white);
       }
 
       .action-btn.recommendations:hover {
-        background: linear-gradient(135deg, #9C27B0, #7b1fa2);
+        background: linear-gradient(135deg, var(--danger), #dc2626);
         color: white;
       }
 
       .action-btn .icon {
-        font-size: 2.5rem;
+        font-size: 3rem;
+        display: block;
       }
 
       .action-btn .label {
         font-size: 1.1rem;
+      }
+
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+      }
+
+      .stat-card {
+        background: linear-gradient(135deg, var(--primary-light), white);
+        padding: 2rem;
+        border-radius: 12px;
+        border-left: 4px solid var(--primary);
+        transition: var(--transition);
+      }
+
+      .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+      }
+
+      .stat-card h3 {
+        color: var(--gray-600);
+        font-size: 0.95rem;
+        margin: 0 0 0.75rem 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+      }
+
+      .stat-card .value {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--primary);
+      }
+
+      .charts-section {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 1.5rem;
+        margin: 2rem 0;
+      }
+
+      .chart-container {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: var(--shadow-md);
+        transition: var(--transition);
+      }
+
+      .chart-container:hover {
+        box-shadow: var(--shadow-lg);
+      }
+
+      .chart-container h3 {
+        margin-top: 0;
+        color: var(--secondary);
+        font-size: 1.2rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .chart-wrapper {
+        position: relative;
+        height: 300px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+      }
+
+      table thead {
+        background: linear-gradient(135deg, var(--primary-light), #f0f4ff);
+      }
+
+      table th {
+        padding: 1rem;
+        text-align: left;
+        font-weight: 700;
+        color: var(--primary);
+        border-bottom: 2px solid var(--primary);
+      }
+
+      table td {
+        padding: 0.9rem 1rem;
+        border-bottom: 1px solid var(--gray-200);
+      }
+
+      table tbody tr:hover {
+        background-color: var(--gray-50);
+      }
+
+      .store-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 1.5rem;
+      }
+
+      .store-item {
+        background: linear-gradient(135deg, var(--primary-light), white);
+        padding: 1.5rem;
+        border-radius: 12px;
+        border-left: 4px solid var(--primary);
+      }
+
+      .store-item strong {
+        color: var(--primary);
+        font-size: 1.1rem;
+      }
+
+      .store-item .sales-value {
+        color: var(--secondary);
+        font-weight: 700;
+        margin-top: 0.5rem;
+      }
+
+      .charts-section {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+        gap: 2rem;
+        margin-bottom: 2.5rem;
+      }
+
+      .chart-container {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--gray-200);
+        transition: var(--transition);
+      }
+
+      .chart-container:hover {
+        box-shadow: var(--shadow-lg);
+        transform: translateY(-4px);
+      }
+
+      .chart-container.full-width {
+        grid-column: 1 / -1;
+      }
+
+      .chart-container h3 {
+        font-size: 1.3rem;
+        color: var(--secondary);
+        margin-bottom: 1.5rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+      }
+
+      .chart-wrapper {
+        position: relative;
+        height: 350px;
+        margin-bottom: 1rem;
+      }
+
+      .chart-container.full-width .chart-wrapper {
+        height: 400px;
+      }
+
+      .chart-info {
+        font-size: 0.85rem;
+        color: var(--gray-500);
+        padding: 0.75rem;
+        background: var(--gray-50);
+        border-left: 3px solid var(--primary);
+        border-radius: 6px;
+        margin-top: 1rem;
+      }
+
+      @media (max-width: 1024px) {
+        .charts-section {
+          grid-template-columns: 1fr;
+          gap: 1.5rem;
+        }
+
+        .chart-container.full-width {
+          grid-column: 1;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .chart-wrapper {
+          height: 300px;
+        }
+
+        .chart-container {
+          padding: 1.5rem;
+        }
+
+        .chart-container h3 {
+          font-size: 1.1rem;
+        }
       }
     </style>
   </head>
@@ -172,6 +378,47 @@
         </div>
       </div>
 
+      {% if stores %}
+      <div class="charts-section">
+        <div class="chart-container">
+          <h3>📊 Top 10 Stores by Average Sales</h3>
+          <div class="chart-wrapper">
+            <canvas id="storesChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-container">
+          <h3>📈 Sales Distribution</h3>
+          <div class="chart-wrapper">
+            <canvas id="distributionChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="charts-section">
+        <div class="chart-container">
+          <h3>📊 Sales Range Histogram</h3>
+          <div class="chart-wrapper">
+            <canvas id="histogramChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-container">
+          <h3>💰 Store Performance Comparison</h3>
+          <div class="chart-wrapper">
+            <canvas id="performanceChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="charts-section">
+        <div class="chart-container full-width">
+          <h3>📈 Top 5 Stores Sales Volatility Analysis</h3>
+          <div class="chart-wrapper">
+            <canvas id="volatilityChart"></canvas>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
       <div class="card">
         <h2>📋 Dataset Information</h2>
         <table>
@@ -235,7 +482,7 @@
         <table>
           <tr>
             <td><strong>Status:</strong></td>
-            <td><span style="color: #4CAF50; font-weight: bold;">✅ Data Stored in Database</span></td>
+            <td><span style="color: var(--success); font-weight: bold;">✅ Data Stored in Database</span></td>
           </tr>
           <tr>
             <td><strong>Access Level:</strong></td>
@@ -277,16 +524,19 @@
             {% endfor %}
           </tbody>
         </table>
-        <p style="margin-top: 1rem; color: #666;"><em>📍 Showing first 10 stores. Visit <strong>Analyze Sales</strong> for detailed insights on all stores.</em></p>
+        <p style="margin-top: 1rem; color: var(--gray-600);"><em>📍 Showing first 10 stores. Visit <strong>Analyze Sales</strong> for detailed insights on all stores.</em></p>
       </div>
       {% endif %}
       {% else %}
-      <div class="card" style="background: #fff3cd; border-left: 4px solid #ffc107;">
+      <div class="card" style="background: var(--warning); background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(249, 115, 22, 0.05)); border-left: 4px solid var(--warning);">
         <h2>⚠️ Dataset Not Available</h2>
         <p>The dataset could not be loaded. Please ensure the Walmart-dataset.csv file exists in the data folder, or <a href="/upload">upload your data here</a>.</p>
       </div>
       {% endif %}
     </div>
+    <footer>
+      <p>&copy; 2026 <strong>Seasonal Sales Forecasting System</strong> - Powered by Advanced ARIMA Analytics | All Rights Reserved</p>
+    </footer>
   </body>
   <script>
     // Fetch and display user data storage summary
@@ -300,5 +550,369 @@
         }
       })
       .catch(error => console.log('Data storage summary not available'));
+
+    // Initialize charts with data
+    document.addEventListener('DOMContentLoaded', function() {
+      const stores = {{ stores|tojson if stores else '[]' }};
+      
+      if (stores && stores.length > 0) {
+        // ===== CHART 1: Top 10 Stores Bar Chart =====
+        const topStores = stores.slice(0, 10);
+        const storeLabels = topStores.map(s => `Store #${s.Store}`);
+        const storeAvg = topStores.map(s => s.Avg_Sales);
+        
+        const storesCtx = document.getElementById('storesChart');
+        if (storesCtx) {
+          new Chart(storesCtx, {
+            type: 'bar',
+            data: {
+              labels: storeLabels,
+              datasets: [{
+                label: 'Average Weekly Sales ($)',
+                data: storeAvg,
+                backgroundColor: [
+                  'rgba(59, 130, 246, 0.85)',
+                  'rgba(37, 99, 235, 0.85)',
+                  'rgba(29, 78, 216, 0.85)',
+                  'rgba(37, 99, 235, 0.80)',
+                  'rgba(59, 130, 246, 0.75)',
+                  'rgba(59, 130, 246, 0.70)',
+                  'rgba(96, 165, 250, 0.85)',
+                  'rgba(147, 197, 253, 0.85)',
+                  'rgba(96, 165, 250, 0.80)',
+                  'rgba(191, 219, 254, 0.90)'
+                ],
+                borderColor: [
+                  'rgba(30, 64, 175, 1)',
+                  'rgba(30, 64, 175, 1)',
+                  'rgba(29, 57, 128, 1)',
+                  'rgba(30, 64, 175, 1)',
+                  'rgba(37, 99, 235, 1)',
+                  'rgba(37, 99, 235, 1)',
+                  'rgba(59, 130, 246, 1)',
+                  'rgba(96, 165, 250, 1)',
+                  'rgba(59, 130, 246, 1)',
+                  'rgba(147, 197, 253, 1)'
+                ],
+                borderWidth: 2,
+                borderRadius: 8,
+                shadow: {
+                  offsetX: 2,
+                  offsetY: 2,
+                  blur: 4,
+                  color: 'rgba(0, 0, 0, 0.1)'
+                }
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { 
+                  display: true, 
+                  labels: { 
+                    font: { size: 12, weight: 'bold' },
+                    padding: 15,
+                    usePointStyle: true
+                  }
+                },
+                tooltip: {
+                  backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                  titleFont: { size: 13, weight: 'bold' },
+                  bodyFont: { size: 12 },
+                  padding: 12,
+                  cornerRadius: 8,
+                  displayColors: true
+                }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: { 
+                    callback: function(value) { return '$' + value.toLocaleString(); },
+                    font: { size: 11 }
+                  },
+                  grid: {
+                    color: 'rgba(0, 0, 0, 0.05)',
+                    drawBorder: false
+                  }
+                },
+                x: {
+                  grid: { display: false }
+                }
+              }
+            }
+          });
+        }
+
+        // ===== CHART 2: Sales Distribution Doughnut Chart =====
+        const allSales = stores.flatMap(s => [s.Min_Sales, s.Avg_Sales, s.Max_Sales]);
+        const bins = [
+          allSales.filter(v => v < 5000).length,
+          allSales.filter(v => v >= 5000 && v < 10000).length,
+          allSales.filter(v => v >= 10000 && v < 15000).length,
+          allSales.filter(v => v >= 15000 && v < 20000).length,
+          allSales.filter(v => v >= 20000).length
+        ];
+
+        const distCtx = document.getElementById('distributionChart');
+        if (distCtx) {
+          new Chart(distCtx, {
+            type: 'doughnut',
+            data: {
+              labels: ['<$5K', '$5K-$10K', '$10K-$15K', '$15K-$20K', '>$20K'],
+              datasets: [{
+                data: bins,
+                backgroundColor: [
+                  'rgba(59, 130, 246, 0.85)',
+                  'rgba(37, 99, 235, 0.85)',
+                  'rgba(16, 185, 129, 0.85)',
+                  'rgba(245, 158, 11, 0.85)',
+                  'rgba(239, 68, 68, 0.85)'
+                ],
+                borderColor: [
+                  'rgba(30, 64, 175, 1)',
+                  'rgba(30, 64, 175, 1)',
+                  'rgba(5, 150, 105, 1)',
+                  'rgba(217, 119, 6, 1)',
+                  'rgba(220, 38, 38, 1)'
+                ],
+                borderWidth: 3,
+                hoverOffset: 12
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { 
+                  position: 'bottom',
+                  labels: { 
+                    font: { size: 11, weight: '500' },
+                    padding: 15,
+                    usePointStyle: true,
+                    pointStyle: 'circle'
+                  }
+                },
+                tooltip: {
+                  backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                  titleFont: { size: 13, weight: 'bold' },
+                  bodyFont: { size: 12 },
+                  padding: 12,
+                  cornerRadius: 8,
+                  callbacks: {
+                    label: function(context) {
+                      const label = context.label || '';
+                      const value = context.parsed || 0;
+                      const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                      const percentage = ((value / total) * 100).toFixed(1);
+                      return `${label}: ${value} records (${percentage}%)`;
+                    }
+                  }
+                }
+              }
+            }
+          });
+        }
+
+        // ===== CHART 3: Sales Range Histogram =====
+        const histogramCtx = document.getElementById('histogramChart');
+        if (histogramCtx) {
+          const binSize = 2000;
+          const minSale = Math.min(...allSales);
+          const maxSale = Math.max(...allSales);
+          const histBins = {};
+          
+          for (let i = Math.floor(minSale / binSize); i <= Math.ceil(maxSale / binSize); i++) {
+            const rangeStart = i * binSize;
+            const rangeEnd = (i + 1) * binSize;
+            const label = `$${(i * binSize / 1000).toFixed(0)}K-$${((i + 1) * binSize / 1000).toFixed(0)}K`;
+            histBins[label] = allSales.filter(v => v >= rangeStart && v < rangeEnd).length;
+          }
+          
+          new Chart(histogramCtx, {
+            type: 'bar',
+            data: {
+              labels: Object.keys(histBins),
+              datasets: [{
+                label: 'Frequency',
+                data: Object.values(histBins),
+                backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                borderColor: 'rgba(5, 150, 105, 1)',
+                borderWidth: 2,
+                borderRadius: 6,
+                hoverBackgroundColor: 'rgba(10, 150, 100, 1)'
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              indexAxis: 'x',
+              plugins: {
+                legend: { display: true, labels: { font: { size: 12, weight: 'bold' } } },
+                tooltip: {
+                  backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                  padding: 10,
+                  cornerRadius: 8
+                }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: { font: { size: 11 } },
+                  grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                },
+                x: {
+                  grid: { display: false }
+                }
+              }
+            }
+          });
+        }
+
+        // ===== CHART 4: Store Performance Comparison (Min vs Max) =====
+        const top5Stores = stores.slice(0, 5);
+        const perfLabels = top5Stores.map(s => `Store #${s.Store}`);
+        
+        const perfCtx = document.getElementById('performanceChart');
+        if (perfCtx) {
+          new Chart(perfCtx, {
+            type: 'radar',
+            data: {
+              labels: perfLabels,
+              datasets: [
+                {
+                  label: 'Min Sales',
+                  data: top5Stores.map(s => s.Min_Sales),
+                  borderColor: 'rgba(239, 68, 68, 0.8)',
+                  backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                  pointBackgroundColor: 'rgba(239, 68, 68, 1)',
+                  borderWidth: 2,
+                  tension: 0.4
+                },
+                {
+                  label: 'Avg Sales',
+                  data: top5Stores.map(s => s.Avg_Sales),
+                  borderColor: 'rgba(37, 99, 235, 0.8)',
+                  backgroundColor: 'rgba(37, 99, 235, 0.2)',
+                  pointBackgroundColor: 'rgba(37, 99, 235, 1)',
+                  borderWidth: 2,
+                  tension: 0.4
+                },
+                {
+                  label: 'Max Sales',
+                  data: top5Stores.map(s => s.Max_Sales),
+                  borderColor: 'rgba(16, 185, 129, 0.8)',
+                  backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                  pointBackgroundColor: 'rgba(16, 185, 129, 1)',
+                  borderWidth: 2,
+                  tension: 0.4
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: { font: { size: 11, weight: '500' }, padding: 15 }
+                },
+                tooltip: {
+                  backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                  padding: 10,
+                  cornerRadius: 8
+                }
+              },
+              scales: {
+                r: {
+                  ticks: { 
+                    font: { size: 10 },
+                    callback: function(value) { return '$' + (value / 1000).toFixed(0) + 'K'; }
+                  },
+                  grid: { color: 'rgba(0, 0, 0, 0.08)' }
+                }
+              }
+            }
+          });
+        }
+
+        // ===== CHART 5: Sales Volatility Analysis (Top 5 Stores) =====
+        const volatilityCtx = document.getElementById('volatilityChart');
+        if (volatilityCtx) {
+          const volatilityData = top5Stores.map(s => ({
+            store: `Store #${s.Store}`,
+            volatility: s.Std_Sales,
+            range: s.Max_Sales - s.Min_Sales
+          }));
+          
+          new Chart(volatilityCtx, {
+            type: 'scatter',
+            data: {
+              datasets: [{
+                label: 'Sales Volatility (Standard Deviation)',
+                data: volatilityData.map((d, idx) => ({
+                  x: idx,
+                  y: d.volatility,
+                  r: d.range / 500
+                })),
+                borderColor: 'rgba(245, 158, 11, 1)',
+                backgroundColor: [
+                  'rgba(245, 158, 11, 0.7)',
+                  'rgba(249, 115, 22, 0.7)',
+                  'rgba(239, 68, 68, 0.7)',
+                  'rgba(229, 57, 53, 0.7)',
+                  'rgba(211, 47, 47, 0.7)'
+                ],
+                borderWidth: 2,
+                hoverBorderWidth: 3
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  labels: { font: { size: 12, weight: 'bold' }, padding: 15 }
+                },
+                tooltip: {
+                  backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                  padding: 10,
+                  cornerRadius: 8,
+                  callbacks: {
+                    label: function(context) {
+                      const idx = context.dataIndex;
+                      return volatilityData[idx].store + ': $' + volatilityData[idx].volatility.toLocaleString();
+                    }
+                  }
+                }
+              },
+              scales: {
+                x: {
+                  ticks: {
+                    callback: function(value) {
+                      return volatilityData[value] ? volatilityData[value].store : '';
+                    },
+                    font: { size: 11 }
+                  },
+                  grid: { display: false }
+                },
+                y: {
+                  title: {
+                    display: true,
+                    text: 'Std Deviation ($)'
+                  },
+                  ticks: {
+                    callback: function(value) { return '$' + value.toLocaleString(); },
+                    font: { size: 11 }
+                  },
+                  grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                }
+              }
+            }
+          });
+        }
+      }
+    });
   </script>
 </html>

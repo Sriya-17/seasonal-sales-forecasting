@@ -3,12 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Business Recommendations - DEA Project</title>
+    <title>Smart Recommendations - Sales Forecasting</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --success: #2ecc71;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --info: #3498db;
+            --light: #ecf0f1;
+            --dark: #2c3e50;
         }
 
         body {
@@ -18,139 +30,340 @@
             padding: 20px;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        header {
-            text-align: center;
-            color: white;
-            margin-bottom: 40px;
-            animation: slideDown 0.6s ease-out;
-        }
-
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        header h1 {
-            font-size: 3em;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-
-        header p {
-            font-size: 1.2em;
-            opacity: 0.9;
-        }
-
-        nav {
-            background: rgba(255, 255, 255, 0.1);
+        .navbar {
+            background: white;
             padding: 15px 30px;
             border-radius: 10px;
             margin-bottom: 30px;
-            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        nav a {
-            color: white;
+        .navbar h1 {
+            color: var(--primary);
+            font-size: 1.8em;
+        }
+
+        .navbar a {
+            color: var(--primary);
             text-decoration: none;
-            margin: 0 20px;
+            margin: 0 15px;
             font-weight: 500;
-            transition: opacity 0.3s;
+            transition: color 0.3s;
         }
 
-        nav a:hover {
-            opacity: 0.8;
+        .navbar a:hover {
+            color: var(--secondary);
         }
 
-        .controls {
-            text-align: center;
-            margin-bottom: 30px;
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
         }
 
-        .btn {
-            background: white;
-            color: #667eea;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 25px;
-            font-size: 1em;
-            font-weight: 600;
-            cursor: pointer;
-            margin: 0 10px;
-            transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
-        }
-
-        .btn:active {
-            transform: translateY(0);
-        }
-
-        .status {
+        .header {
             color: white;
-            margin-top: 15px;
-            font-weight: 500;
-            min-height: 20px;
+            margin-bottom: 30px;
+            text-align: center;
         }
 
-        .status.loading {
-            animation: pulse 1.5s infinite;
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
         }
 
-        .section {
+        /* QUICK WINS SECTION */
+        .quick-wins-section {
             margin-bottom: 40px;
         }
 
-        .section-title {
-            font-size: 2em;
-            color: white;
-            margin-bottom: 20px;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        .section-header {
             display: flex;
             align-items: center;
             gap: 10px;
+            margin-bottom: 20px;
         }
 
-        .section-title span {
-            font-size: 0.8em;
+        .section-header h2 {
+            color: white;
+            font-size: 1.8em;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
         }
 
-        .grid {
+        .badge-primary {
+            background: var(--danger);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .quick-wins-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 20px;
+            margin-bottom: 20px;
         }
 
-        .card {
+        .quick-win-card {
             background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-left: 5px solid var(--success);
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .quick-win-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+
+        .quick-win-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 10px;
+        }
+
+        .quick-win-title {
+            font-size: 1.2em;
+            font-weight: 700;
+            color: var(--dark);
+            max-width: 70%;
+        }
+
+        .effort-badge {
+            background: var(--success);
+            color: white;
+            padding: 5px 12px;
             border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-            transition: all 0.3s ease;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+
+        .quick-win-action {
+            font-size: 0.95em;
+            color: var(--primary);
+            font-weight: 600;
+            margin: 12px 0;
+            padding: 10px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            border-radius: 8px;
+        }
+
+        .quick-win-impact {
+            display: flex;
+            gap: 20px;
+            margin: 15px 0;
+        }
+
+        .impact-item {
+            flex: 1;
+        }
+
+        .impact-label {
+            font-size: 0.8em;
+            color: #777;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .impact-value {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: var(--success);
+            margin-top: 5px;
+        }
+
+        .quick-win-action-btn {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 10px;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .quick-win-action-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        /* INSIGHTS DASHBOARD */
+        .insights-section {
+            margin-bottom: 40px;
+        }
+
+        .insights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .insight-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
             animation: fadeIn 0.5s ease-out forwards;
             opacity: 0;
         }
 
         @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        .insight-card:nth-child(1) { animation-delay: 0s; }
+        .insight-card:nth-child(2) { animation-delay: 0.1s; }
+        .insight-card:nth-child(3) { animation-delay: 0.2s; }
+        .insight-card:nth-child(4) { animation-delay: 0.3s; }
+
+        .insight-card.elasticity {
+            border-top: 4px solid var(--info);
+        }
+
+        .insight-card.volatility {
+            border-top: 4px solid var(--warning);
+        }
+
+        .insight-card.peak {
+            border-top: 4px solid var(--danger);
+        }
+
+        .insight-card.position {
+            border-top: 4px solid var(--primary);
+        }
+
+        .insight-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .insight-label {
+            font-size: 0.85em;
+            color: #777;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .insight-value {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 5px;
+        }
+
+        .insight-description {
+            font-size: 0.9em;
+            color: #555;
+            line-height: 1.4;
+        }
+
+        /* RECOMMENDATIONS TABS */
+        .tabs-container {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+        }
+
+        .tabs-header {
+            display: flex;
+            border-bottom: 2px solid var(--light);
+            background: linear-gradient(90deg, #f8f9fa, #ffffff);
+            overflow-x: auto;
+        }
+
+        .tab-button {
+            padding: 20px;
+            background: none;
+            border: none;
+            font-size: 1em;
+            font-weight: 600;
+            color: #777;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            text-align: center;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .tab-button:hover {
+            color: var(--primary);
+        }
+
+        .tab-button.active {
+            color: var(--primary);
+        }
+
+        .tab-button.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--primary);
+        }
+
+        .tab-content {
+            padding: 30px;
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* RECOMMENDATION CARDS */
+        .recommendations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .rec-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid var(--light);
+            transition: all 0.3s;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
             from {
                 opacity: 0;
                 transform: translateY(20px);
@@ -161,626 +374,549 @@
             }
         }
 
-        .card:hover {
+        .rec-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+            border-color: var(--primary);
         }
 
-        .card-header {
-            font-size: 1.3em;
-            font-weight: 600;
-            margin-bottom: 10px;
-            color: #333;
-        }
-
-        .month {
-            color: #667eea;
-            font-weight: 700;
-            margin-bottom: 15px;
-        }
-
-        .action-badge {
-            display: inline-block;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 0.85em;
+        .rec-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
             margin-bottom: 12px;
         }
 
-        .action-badge.increase {
+        .rec-title {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: var(--dark);
+            flex: 1;
+        }
+
+        .rec-badge {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.75em;
+            font-weight: 600;
+            white-space: nowrap;
+            margin-left: 8px;
+        }
+
+        .badge-stock {
             background: #e8f5e9;
             color: #2e7d32;
         }
 
-        .action-badge.decrease {
-            background: #ffebee;
-            color: #c62828;
+        .badge-stock.increase {
+            background: #c8e6c9;
+            color: #1b5e20;
         }
 
-        .action-badge.maintain {
-            background: #e3f2fd;
-            color: #1565c0;
-        }
-
-        .priority-badge {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 15px;
-            font-weight: 600;
-            font-size: 0.8em;
-            margin-left: 10px;
-        }
-
-        .priority-badge.high {
-            background: #ffcdd2;
+        .badge-stock.decrease {
+            background: #ffcccc;
             color: #b71c1c;
         }
 
-        .priority-badge.medium {
-            background: #fff3e0;
-            color: #e65100;
-        }
-
-        .priority-badge.low {
-            background: #e0f2f1;
-            color: #004d40;
-        }
-
-        .card-content {
-            color: #555;
-            line-height: 1.6;
-            font-size: 0.95em;
-        }
-
-        .stat {
-            margin: 10px 0;
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
-        }
-
-        .stat:last-child {
-            border-bottom: none;
-        }
-
-        .stat-label {
-            color: #777;
-            font-size: 0.85em;
-            font-weight: 500;
-        }
-
-        .stat-value {
-            color: #333;
-            font-weight: 700;
-            font-size: 1.1em;
-        }
-
-        .strategy-badge {
-            display: inline-block;
-            padding: 10px 15px;
-            border-radius: 8px;
-            background: #f5f5f5;
-            color: #333;
-            font-weight: 600;
+        .rec-content {
             font-size: 0.9em;
-            margin-bottom: 10px;
+            color: #555;
+            margin: 15px 0;
+            line-height: 1.6;
         }
 
-        .strategy-badge.premium {
-            background: #fff9c4;
-            color: #f57f17;
+        .rec-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 15px 0;
         }
 
-        .strategy-badge.normal {
-            background: #e8eaf6;
-            color: #3949ab;
+        .stat-box {
+            background: var(--light);
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
         }
 
-        .strategy-badge.light {
-            background: #f3e5f5;
-            color: #6a1b9a;
-        }
-
-        .strategy-badge.aggressive {
-            background: #ffccbc;
-            color: #bf360c;
-        }
-
-        .campaign-badge {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 12px;
+        .stat-box-label {
+            font-size: 0.75em;
+            color: #777;
             font-weight: 600;
-            font-size: 0.8em;
-            margin-left: 10px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
         }
 
-        .campaign-badge.standard {
-            background: #e0e0e0;
-            color: #424242;
-        }
-
-        .campaign-badge.aggressive {
-            background: #ff6e40;
-            color: white;
-        }
-
-        .festival-name {
-            font-size: 1.2em;
-            color: #667eea;
+        .stat-box-value {
+            font-size: 1.3em;
             font-weight: 700;
-            margin-bottom: 8px;
+            color: var(--primary);
         }
 
-        .promotional-message {
-            font-size: 1.05em;
-            font-weight: 500;
-            color: #333;
-            margin: 10px 0;
-            padding: 10px;
-            background: #f9f9f9;
-            border-left: 4px solid #667eea;
-        }
-
-        .summary-section {
+        /* SUMMARY SECTION */
+        .summary-banner {
             background: white;
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 30px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-            animation: fadeIn 0.5s ease-out;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
         }
 
-        .summary-title {
-            font-size: 1.8em;
-            color: #333;
+        .summary-banner h3 {
+            color: var(--primary);
+            font-size: 1.3em;
             margin-bottom: 15px;
-            font-weight: 700;
         }
 
         .summary-text {
             color: #555;
             line-height: 1.8;
-            font-size: 1.05em;
-            margin-bottom: 20px;
+            font-size: 0.95em;
+            margin-bottom: 15px;
         }
 
-        .insights {
+        .summary-points {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 15px;
             margin-top: 20px;
         }
 
-        .insight {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            font-size: 0.95em;
-            line-height: 1.6;
+        .summary-point {
+            padding: 15px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            border-left: 4px solid var(--primary);
+            border-radius: 6px;
         }
 
-        .demand-analysis {
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 30px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+        .summary-point-text {
+            color: var(--dark);
+            font-weight: 600;
+            font-size: 0.9em;
+            line-height: 1.5;
         }
 
-        .analysis-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-
-        .metric {
-            background: #f9f9f9;
-            padding: 20px;
-            border-radius: 10px;
-            border-left: 4px solid #667eea;
-        }
-
-        .metric-label {
-            color: #777;
-            font-size: 0.85em;
-            font-weight: 500;
-            margin-bottom: 5px;
-        }
-
-        .metric-value {
-            font-size: 1.8em;
-            font-weight: 700;
-            color: #333;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: white;
-        }
-
-        .spinner {
-            display: inline-block;
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(255,255,255,0.3);
-            border-top: 4px solid white;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
+        /* FOOTER */
         .footer {
             text-align: center;
             color: white;
-            margin-top: 50px;
             padding: 20px;
-            opacity: 0.8;
-            font-size: 0.9em;
+            margin-top: 40px;
+            opacity: 0.9;
         }
 
-        .empty-message {
-            background: white;
-            border-radius: 15px;
-            padding: 40px;
+        /* EMPTY STATE */
+        .empty-state {
             text-align: center;
-            color: #999;
-            font-size: 1.1em;
+            padding: 60px 20px;
+            color: white;
         }
 
-        .error-message {
-            background: #ffcdd2;
-            color: #b71c1c;
-            padding: 15px;
-            border-radius: 10px;
+        .empty-state-icon {
+            font-size: 4em;
             margin-bottom: 20px;
-            border-left: 4px solid #b71c1c;
         }
 
+        .empty-state h2 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+
+        /* RESPONSIVE */
         @media (max-width: 768px) {
-            header h1 {
-                font-size: 2em;
+            .insights-grid {
+                grid-template-columns: 1fr 1fr;
             }
 
-            .grid {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .tabs-header {
+                flex-wrap: wrap;
+            }
+
+            .tab-button {
+                padding: 15px 10px;
+                font-size: 0.9em;
+            }
+
+            .quick-wins-grid {
                 grid-template-columns: 1fr;
             }
 
-            nav a {
-                display: block;
-                margin: 10px 0;
+            .recommendations-grid {
+                grid-template-columns: 1fr;
             }
+        }
 
-            .section-title {
-                font-size: 1.5em;
-            }
+        /* ERROR STATES */
+        .error-banner {
+            background: var(--danger);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>💡 Business Recommendations</h1>
-            <p>Smart suggestions based on sales analysis and forecasts</p>
-        </header>
-
-        <nav>
+    <div class="navbar">
+        <h1>💡 Smart Recommendations</h1>
+        <div>
             <a href="/">Dashboard</a>
-            <a href="/eda">Analysis</a>
-            <a href="/forecast">Forecast</a>
-            <a href="/recommendation" style="font-weight: bold; opacity: 1;">Recommendations</a>
-        </nav>
+            <a href="/forecast">Forecasts</a>
+            <a href="/recommendation" style="color: var(--secondary); font-weight: bold;">Recommendations</a>
+            <a href="/profile">Profile</a>
+        </div>
+    </div>
 
-        <div class="controls">
-            <button class="btn" onclick="generateRecommendations()">🔄 Generate Recommendations</button>
-            <button class="btn" onclick="refreshPage()">🔃 Refresh</button>
-            <div class="status" id="status"></div>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Intelligent Business Recommendations</h1>
+            <p>AI-powered insights to boost your sales and optimize operations</p>
         </div>
 
-        <!-- Recommendations Container -->
-        <div id="recommendations-container">
-            <!-- Content will be loaded here -->
+        {% if error %}
+        <div class="error-banner">
+            <div>⚠️ {{ error }}</div>
+        </div>
+        {% endif %}
+
+        {% if not quick_wins and not recommendations %}
+        <div class="empty-state">
+            <div class="empty-state-icon">📈</div>
+            <h2>No Recommendations Available Yet</h2>
+            <p>Upload and analyze your sales data to get personalized recommendations</p>
+        </div>
+        {% else %}
+
+        <!-- QUICK WINS SECTION -->
+        {% if quick_wins %}
+        <div class="quick-wins-section">
+            <div class="section-header">
+                <h2>⚡ Quick Wins - Start Here!</h2>
+                <div class="badge-primary">{{ quick_wins|length }} Actions</div>
+            </div>
+            <p style="color: white; margin-bottom: 15px; font-size: 1em;">💡 These are the most impactful recommendations you can implement immediately to boost revenue:</p>
+            
+            <div class="quick-wins-grid">
+                {% for win in quick_wins %}
+                <div class="quick-win-card">
+                    <div class="quick-win-header">
+                        <div class="quick-win-title">{{ win.title }}</div>
+                        <div class="effort-badge">{{ win.effort }}</div>
+                    </div>
+                    
+                    <div style="color: #666; font-size: 0.9em; margin: 8px 0;">{{ win.description }}</div>
+                    
+                    <div class="quick-win-action">
+                        ✓ {{ win.action }}
+                    </div>
+                    
+                    <div class="quick-win-impact">
+                        <div class="impact-item">
+                            <div class="impact-label">Impact</div>
+                            <div class="impact-value">{{ win.expected_impact }}</div>
+                        </div>
+                        <div class="impact-item">
+                            <div class="impact-label">Timeline</div>
+                            <div style="font-size: 1.1em; font-weight: 700; color: var(--info); margin-top: 5px;">{{ win.timeframe }}</div>
+                        </div>
+                    </div>
+                    
+                    <button class="quick-win-action-btn">📌 {{ win.title }} →</button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- INSIGHTS DASHBOARD -->
+        {% if recommendations and recommendations.price_elasticity %}
+        <div class="insights-section">
+            <div class="section-header">
+                <h2>📈 Key Business Insights</h2>
+            </div>
+            <p style="color: white; margin-bottom: 15px;">Quick overview of your sales patterns and opportunities:</p>
+            
+            <div class="insights-grid">
+                <!-- Elasticity Card -->
+                {% if recommendations.price_elasticity %}
+                <div class="insight-card elasticity">
+                    <div class="insight-icon">💵</div>
+                    <div class="insight-label">Price Sensitivity</div>
+                    <div class="insight-value">{{ recommendations.price_elasticity.elasticity_type|replace('(', '<br><span style="font-size: 0.7em; color: #777;">')|replace(')', '</span>')|safe }}</div>
+                    <div class="insight-description">{{ recommendations.price_elasticity.recommendation }}</div>
+                </div>
+                {% endif %}
+
+                <!-- Volatility Card -->
+                {% if recommendations.demand_analysis %}
+                <div class="insight-card volatility">
+                    <div class="insight-icon">📊</div>
+                    <div class="insight-label">Demand Volatility</div>
+                    <div class="insight-value">{{ "High" if recommendations.demand_analysis.volatility > 0.3 else "Medium" if recommendations.demand_analysis.volatility > 0.15 else "Low" }}</div>
+                    <div class="insight-description">{{ "%0.2f" | format(recommendations.demand_analysis.volatility) }} seasonality factor</div>
+                </div>
+
+                <!-- Peak to Low Ratio -->
+                <div class="insight-card peak">
+                    <div class="insight-icon">📈</div>
+                    <div class="insight-label">Peak to Low Ratio</div>
+                    <div class="insight-value">{{ "%0.1f" | format(recommendations.demand_analysis.peak_value / (recommendations.demand_analysis.lowest_value|max(1))) }}x</div>
+                    <div class="insight-description">Big opportunity for dynamic pricing</div>
+                </div>
+
+                <!-- Market Position -->
+                {% if recommendations.competitive_positioning %}
+                <div class="insight-card position">
+                    <div class="insight-icon">🎯</div>
+                    <div class="insight-label">Market Position</div>
+                    <div class="insight-value">{{ recommendations.competitive_positioning.market_position|replace(' PRODUCT', '')->truncate(18, true) }}</div>
+                    <div class="insight-description">{{ recommendations.competitive_positioning.recommended_strategy|truncate(50, true) }}</div>
+                </div>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- DETAILED RECOMMENDATIONS TABS -->
+        <div class="tabs-container">
+            <div class="tabs-header">
+                <button class="tab-button active" onclick="switchTab(event, 'stock')">📦 Inventory</button>
+                <button class="tab-button" onclick="switchTab(event, 'pricing')">💰 Pricing</button>
+                <button class="tab-button" onclick="switchTab(event, 'revenue')">📊 Revenue</button>
+                <button class="tab-button" onclick="switchTab(event, 'festivals')">🎉 Promotions</button>
+                <button class="tab-button" onclick="switchTab(event, 'inventory')">🏢 Operations</button>
+            </div>
+
+            <!-- STOCK RECOMMENDATIONS TAB -->
+            <div id="stock" class="tab-content active">
+                <h3 style="color: var(--primary); margin-bottom: 15px;">📦 When to Stock Up / Reduce Inventory</h3>
+                <p style="color: #666; margin-bottom: 20px;">Adjust your inventory levels by month based on predicted demand patterns.</p>
+                <div class="recommendations-grid">
+                    {% for rec in recommendations.stock_recommendations %}
+                    <div class="rec-card">
+                        <div class="rec-header">
+                            <div class="rec-title">{{ rec.month }}</div>
+                            <div class="rec-badge" style="background: {% if rec.action == 'INCREASE' %}#c8e6c9{% elif rec.action == 'DECREASE' %}#ffcccc{% else %}#e0e0e0{% endif %}; color: {% if rec.action == 'INCREASE' %}#1b5e20{% elif rec.action == 'DECREASE' %}#b71c1c{% else %}#424242{% endif %};">
+                                {{ rec.action }}
+                            </div>
+                        </div>
+                        <div class="rec-content">
+                            <strong>What to do:</strong> {{ rec.recommendation }}
+                        </div>
+                        <div class="rec-stats">
+                            <div class="stat-box">
+                                <div class="stat-box-label">Expected Sales</div>
+                                <div class="stat-box-value">${{ "%.0f" | format(rec.expected_sales) }}</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-box-label">Change</div>
+                                <div class="stat-box-value">{{ rec.percentage_change }}%</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- PRICING RECOMMENDATIONS TAB -->
+            <div id="pricing" class="tab-content">
+                <h3 style="color: var(--primary); margin-bottom: 15px;">💰 Smart Pricing Strategy</h3>
+                <p style="color: #666; margin-bottom: 20px;">When to offer discounts and when to increase prices for maximum profit.</p>
+                <div class="recommendations-grid">
+                    {% for rec in recommendations.pricing_recommendations %}
+                    <div class="rec-card">
+                        <div class="rec-header">
+                            <div class="rec-title">{{ rec.month }}</div>
+                            <div class="rec-badge" style="background: #e3f2fd; color: #1565c0;">
+                                {% if rec.discount_percent > 0 -%}
+                                -{{ rec.discount_percent }}%
+                                {%- else -%}
+                                NO DISCOUNT
+                                {%- endif %}
+                            </div>
+                        </div>
+                        <div class="rec-content">
+                            <strong style="color: var(--primary);">{{ rec.strategy }}</strong><br>
+                            {{ rec.description }}
+                        </div>
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee; font-size: 0.85em; color: #666;">
+                            <strong>Why:</strong> {{ rec.rationale }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- REVENUE STRATEGY TAB -->
+            <div id="revenue" class="tab-content">
+                <h3 style="color: var(--primary); margin-bottom: 15px;">📊 Ways to Increase Revenue</h3>
+                <p style="color: #666; margin-bottom: 20px;">Proven strategies to boost your total sales and profit.</p>
+                {% if recommendations.revenue_optimization %}
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="margin-bottom: 8px;"><strong>Estimated Current Annual Revenue:</strong> ${{ "%0.2f" | format(recommendations.revenue_optimization.current_annual_revenue_estimate) }}</div>
+                    <div style="margin-bottom: 8px;"><strong>Your Product Type:</strong> {{ recommendations.revenue_optimization.elasticity_type }}</div>
+                    <div><strong>Total Potential Revenue Increase:</strong> <span style="color: var(--success); font-weight: 700; font-size: 1.2em;">+{{ "%0.1f" | format(recommendations.revenue_optimization.estimated_total_revenue_uplift) }}%</span></div>
+                </div>
+                <div class="recommendations-grid">
+                    {% for strategy in recommendations.revenue_optimization.revenue_optimization_strategies %}
+                    <div class="rec-card">
+                        <div class="rec-header">
+                            <div class="rec-title">{{ strategy.name }}</div>
+                            <div class="rec-badge" style="background: {% if strategy.risk_level == 'LOW' %}#c8e6c9{% elif strategy.risk_level == 'MEDIUM' %}#fff9c4{% else %}#ffcccc{% endif %}; color: {% if strategy.risk_level == 'LOW' %}#1b5e20{% elif strategy.risk_level == 'MEDIUM' %}#f57f17{% else %}#b71c1c{% endif %};">
+                                {{ strategy.risk_level }} Risk
+                            </div>
+                        </div>
+                        <div class="rec-content">
+                            <strong style="color: var(--info);">{{ strategy.description }}</strong><br><br>
+                            <strong>ACTION:</strong> {{ strategy.tactic }}
+                        </div>
+                        <div class="rec-stats">
+                            <div class="stat-box">
+                                <div class="stat-box-label">Revenue Boost</div>
+                                <div class="stat-box-value" style="color: var(--success);">+{{ strategy.expected_revenue_impact }}%</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-box-label">Start In</div>
+                                <div class="stat-box-value" style="font-size: 0.85em;">{{ strategy.implementation_timeline }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- PROMOTIONS TAB -->
+            <div id="festivals" class="tab-content">
+                <h3 style="color: var(--primary); margin-bottom: 15px;">🎉 Seasonal Sales & Holiday Promotions</h3>
+                <p style="color: #666; margin-bottom: 20px;">Special campaigns timed with holidays and seasonal events to maximize sales.</p>
+                <div class="recommendations-grid">
+                    {% for festival in recommendations.festival_promotions %}
+                    <div class="rec-card">
+                        <div class="rec-header">
+                            <div class="rec-title">{{ festival.festival_name }}</div>
+                            <div class="rec-badge" style="background: #fff3e0; color: #e65100;">{{ festival.month }}</div>
+                        </div>
+                        <div class="rec-content">
+                            <strong>{{ festival.promotional_message }}</strong><br><br>
+                            <span style="font-size: 0.9em;">📅 {{ festival.implementation_timing }}</span>
+                        </div>
+                        <div class="rec-stats">
+                            <div class="stat-box">
+                                <div class="stat-box-label">Discount</div>
+                                <div class="stat-box-value">{{ festival.recommended_discount }}%</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-box-label">Stock Up</div>
+                                <div class="stat-box-value">+{{ festival.stock_increase_percent }}%</div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee; font-size: 0.85em; color: #666;">
+                            📊 Expected Sales Increase: <strong style="color: var(--success);">{{ "%0.1f" | format(festival.expected_sales_lift) }}%</strong>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- OPERATIONS TAB -->
+            <div id="inventory" class="tab-content">
+                <h3 style="color: var(--primary); margin-bottom: 15px;">🏢 Professional Inventory Management</h3>
+                <p style="color: #666; margin-bottom: 20px;">Scientific approach to ordering - never run out of stock, never overstock.</p>
+                <div class="recommendations-grid">
+                    {% for inv in recommendations.inventory_optimization %}
+                    <div class="rec-card">
+                        <div class="rec-header">
+                            <div class="rec-title">{{ inv.month }}</div>
+                            <div class="rec-badge" style="background: {% if inv.order_urgency == 'CRITICAL' %}#ffcccc{% else %}#e8f5e9{% endif %}; color: {% if inv.order_urgency == 'CRITICAL' %}#b71c1c{% else %}#1b5e20{% endif %};">
+                                {{ inv.order_urgency }}
+                            </div>
+                        </div>
+                        <div class="rec-content">
+                            <strong>{{ inv.recommended_action }}</strong><br>
+                            <span style="font-size: 0.9em;">Order Lead Time: {{ inv.lead_time_days }} days</span>
+                        </div>
+                        <div style="margin: 12px 0; padding: 12px; background: #f5f5f5; border-radius: 6px; font-size: 0.9em; line-height: 1.8;">
+                            <div><strong>🎯 Order When Stock Reaches:</strong> {{ "%0.0f" | format(inv.reorder_point) }} units</div>
+                            <div><strong>🛡️ Keep Safety Buffer Of:</strong> {{ "%0.0f" | format(inv.safety_stock) }} units</div>
+                            <div><strong>📈 Maximum Stock Level:</strong> {{ "%0.0f" | format(inv.max_stock_level) }} units</div>
+                            <div><strong>💰 Monthly Cost to Hold Stock:</strong> ${{ "%0.2f" | format(inv.holding_cost_monthly) }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
 
-        <div class="footer">
-            <p>📊 Recommendation Engine • Based on historical sales data and forecasting models</p>
-            <p id="footer-timestamp"></p>
+        <!-- EXECUTIVE SUMMARY -->
+        {% if recommendations.summary %}
+        <div class="summary-banner">
+            <h3>📋 What This All Means For Your Business</h3>
+            <div class="summary-text">
+                {{ recommendations.summary.summary }}
+            </div>
+            <div class="summary-points">
+                {% if recommendations.summary.key_insight_1 %}
+                <div class="summary-point">
+                    <div class="summary-point-text">{{ recommendations.summary.key_insight_1 }}</div>
+                </div>
+                {% endif %}
+                {% if recommendations.summary.key_insight_2 %}
+                <div class="summary-point">
+                    <div class="summary-point-text">{{ recommendations.summary.key_insight_2 }}</div>
+                </div>
+                {% endif %}
+                {% if recommendations.summary.key_insight_3 %}
+                <div class="summary-point">
+                    <div class="summary-point-text">{{ recommendations.summary.key_insight_3 }}</div>
+                </div>
+                {% endif %}
+                {% if recommendations.summary.key_insight_4 %}
+                <div class="summary-point">
+                    <div class="summary-point-text">{{ recommendations.summary.key_insight_4 }}</div>
+                </div>
+                {% endif %}
+            </div>
         </div>
+        {% endif %}
+
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        <p>💡 Smart Recommendations Engine v2.0 | Making Your Sales Smarter Every Day</p>
     </div>
 
     <script>
-        // Load recommendations on page load
+        function switchTab(event, tabName) {
+            // Hide all tabs
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            // Remove active class from all buttons
+            const buttons = document.querySelectorAll('.tab-button');
+            buttons.forEach(btn => btn.classList.remove('active'));
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Add animation on load
         document.addEventListener('DOMContentLoaded', function() {
-            loadRecommendations();
-            updateFooterTimestamp();
+            const cards = document.querySelectorAll('.rec-card');
+            cards.forEach((card, index) => {
+                card.style.animationDelay = (index * 0.05) + 's';
+            });
         });
-
-        function updateFooterTimestamp() {
-            const now = new Date();
-            document.getElementById('footer-timestamp').textContent = 
-                'Last updated: ' + now.toLocaleString();
-        }
-
-        function loadRecommendations() {
-            const container = document.getElementById('recommendations-container');
-            container.innerHTML = `
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p style="margin-top: 20px;">Loading recommendations...</p>
-                </div>
-            `;
-
-            fetch('/api/recommendations')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.success) {
-                        displayRecommendations(data.recommendations);
-                    } else {
-                        container.innerHTML = `<div class="error-message">Error: ${data.message}</div>`;
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    container.innerHTML = `<div class="error-message">Failed to load recommendations. Please try again.</div>`;
-                });
-        }
-
-        function generateRecommendations() {
-            const status = document.getElementById('status');
-            status.textContent = '⏳ Generating recommendations...';
-            status.classList.add('loading');
-
-            fetch('/api/recommendations/generate')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        status.textContent = '✅ Recommendations generated!';
-                        status.classList.remove('loading');
-                        setTimeout(() => loadRecommendations(), 500);
-                        setTimeout(() => { status.textContent = ''; }, 3000);
-                    } else {
-                        status.textContent = '❌ Generation failed';
-                        status.classList.remove('loading');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    status.textContent = '❌ Error generating recommendations';
-                    status.classList.remove('loading');
-                });
-        }
-
-        function refreshPage() {
-            location.reload();
-        }
-
-        function displayRecommendations(recs) {
-            const container = document.getElementById('recommendations-container');
-            let html = '';
-
-            // Demand Analysis Section
-            if (recs.demand_analysis && recs.demand_analysis.status === 'success') {
-                const analysis = recs.demand_analysis;
-                html += `
-                    <div class="demand-analysis">
-                        <h2 class="summary-title">📊 Demand Analysis</h2>
-                        <div class="analysis-grid">
-                            <div class="metric">
-                                <div class="metric-label">Average Sales</div>
-                                <div class="metric-value">$${(analysis.overall_mean / 1e6).toFixed(1)}M</div>
-                            </div>
-                            <div class="metric">
-                                <div class="metric-label">Volatility Index</div>
-                                <div class="metric-value">${analysis.volatility.toFixed(2)}</div>
-                            </div>
-                            <div class="metric">
-                                <div class="metric-label">High Demand Months</div>
-                                <div class="metric-value">${analysis.high_demand_count}</div>
-                            </div>
-                            <div class="metric">
-                                <div class="metric-label">Low Demand Months</div>
-                                <div class="metric-value">${analysis.low_demand_count}</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            // Summary Section
-            if (recs.summary) {
-                html += `
-                    <div class="summary-section">
-                        <h2 class="summary-title">🎯 Executive Summary</h2>
-                        <div class="summary-text">${recs.summary.summary}</div>
-                        <div class="insights">
-                            <div class="insight">${recs.summary.key_insight_1}</div>
-                            <div class="insight">${recs.summary.key_insight_2}</div>
-                            <div class="insight">${recs.summary.key_insight_3}</div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            // Stock Recommendations
-            if (recs.stock_recommendations && recs.stock_recommendations.length > 0) {
-                html += '<div class="section">';
-                html += '<h2 class="section-title">📦 Stock Recommendations</h2>';
-                html += '<div class="grid">';
-
-                recs.stock_recommendations.forEach((rec, index) => {
-                    const actionClass = rec.action.toLowerCase();
-                    const priorityClass = rec.priority.toLowerCase();
-                    const change = rec.percentage_change >= 0 ? '+' : '';
-
-                    html += `
-                        <div class="card" style="animation-delay: ${index * 0.1}s">
-                            <div class="month">${rec.month}</div>
-                            <div>
-                                <span class="action-badge ${actionClass}">${rec.action}</span>
-                                <span class="priority-badge ${priorityClass}">${rec.priority}</span>
-                            </div>
-                            <div class="card-content">
-                                <div style="margin: 15px 0;">
-                                    <div class="stat">
-                                        <div class="stat-label">Recommendation</div>
-                                        <div class="stat-value" style="color: #667eea;">${rec.recommendation}</div>
-                                    </div>
-                                    <div class="stat">
-                                        <div class="stat-label">Demand Change</div>
-                                        <div class="stat-value">${change}${rec.percentage_change}%</div>
-                                    </div>
-                                    <div class="stat">
-                                        <div class="stat-label">Expected Sales</div>
-                                        <div class="stat-value">$${(rec.expected_sales / 1e6).toFixed(1)}M</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                html += '</div></div>';
-            }
-
-            // Pricing Recommendations
-            if (recs.pricing_recommendations && recs.pricing_recommendations.length > 0) {
-                html += '<div class="section">';
-                html += '<h2 class="section-title">💰 Pricing Strategy</h2>';
-                html += '<div class="grid">';
-
-                recs.pricing_recommendations.forEach((rec, index) => {
-                    const strategyClass = rec.strategy.toLowerCase().replace(/ /g, '-');
-
-                    html += `
-                        <div class="card" style="animation-delay: ${index * 0.1}s">
-                            <div class="month">${rec.month}</div>
-                            <div class="strategy-badge ${strategyClass}">${rec.strategy}</div>
-                            <div class="card-content">
-                                <div style="margin: 15px 0;">
-                                    <div class="stat">
-                                        <div class="stat-label">Discount Percentage</div>
-                                        <div class="stat-value">${rec.discount_percent}%</div>
-                                    </div>
-                                    <div class="stat">
-                                        <div class="stat-label">Strategy</div>
-                                        <div class="stat-value" style="font-size: 0.95em; color: #555;">${rec.description}</div>
-                                    </div>
-                                    <div class="stat">
-                                        <div class="stat-label">Rationale</div>
-                                        <div style="color: #777; font-size: 0.9em;">${rec.rationale}</div>
-                                    </div>
-                                    <div class="stat">
-                                        <div class="stat-label">Expected Impact</div>
-                                        <div style="color: #667eea; font-weight: 600;">${rec.expected_impact}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                html += '</div></div>';
-            }
-
-            // Festival Promotions
-            if (recs.festival_promotions && recs.festival_promotions.length > 0) {
-                html += '<div class="section">';
-                html += '<h2 class="section-title">🎉 Festival Promotions</h2>';
-                html += '<div class="grid">';
-
-                recs.festival_promotions.forEach((promo, index) => {
-                    const campaignClass = promo.campaign_intensity.toLowerCase();
-
-                    html += `
-                        <div class="card" style="animation-delay: ${index * 0.1}s">
-                            <div class="month">${promo.month}</div>
-                            <div class="festival-name">${promo.festival_name}</div>
-                            <div class="campaign-badge ${campaignClass}">${promo.campaign_intensity}</div>
-                            <div class="card-content">
-                                <div class="promotional-message">${promo.promotional_message}</div>
-                                <div style="margin: 15px 0;">
-                                    <div class="stat">
-                                        <div class="stat-label">Recommended Discount</div>
-                                        <div class="stat-value">${promo.recommended_discount}%</div>
-                                    </div>
-                                    <div class="stat">
-                                        <div class="stat-label">Stock Increase</div>
-                                        <div class="stat-value">${promo.stock_increase_percent}%</div>
-                                    </div>
-                                    <div class="stat">
-                                        <div class="stat-label">Expected Sales Lift</div>
-                                        <div class="stat-value">${promo.expected_sales_lift}%</div>
-                                    </div>
-                                    <div class="stat">
-                                        <div class="stat-label">Timing</div>
-                                        <div style="color: #777; font-size: 0.9em;">${promo.implementation_timing}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                html += '</div></div>';
-            }
-
-            container.innerHTML = html;
-        }
     </script>
 </body>
-</html>
-        {% endif %}
-      </div>
-
-      <div class="card">
-        <h2>⚠️ Stores Needing Improvement</h2>
-        {% if low_stores %}
-        <table>
-          <thead>
-            <tr>
-              <th>Store ID</th>
-              <th>Avg Sales</th>
-              <th>Min Sales</th>
-              <th>Max Sales</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for store in low_stores %}
-            <tr>
-              <td><strong>{{ store.Store }}</strong></td>
-              <td>${{ "{:,.0f}".format(store.Avg_Sales) }}</td>
-              <td>${{ "{:,.0f}".format(store.Min_Sales) }}</td>
-              <td>${{ "{:,.0f}".format(store.Max_Sales) }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <p>No data available.</p>
-        {% endif %}
-      </div>
-
-      <div class="card">
-        <h2>💡 Strategic Insights</h2>
-        <ul style="line-height: 1.8;">
-          <li>Focus marketing resources on underperforming stores</li>
-          <li>Analyze successful strategies from top-performing stores</li>
-          <li>Use forecasts for inventory optimization</li>
-          <li>Monitor seasonal trends for better planning</li>
-        </ul>
-      </div>
-    </div>
-  </body>
 </html>

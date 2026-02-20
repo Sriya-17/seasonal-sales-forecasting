@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Recommendations - Seasonal Sales Forecasting</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .recommendations-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .recommendations-header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .recommendations-header p {
+            opacity: 0.92;
+            font-size: 1rem;
+        }
+
+        /* Quick Wins Section */
+        .quick-wins-section {
+            margin-bottom: 3rem;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .section-title small {
+            background: #dc2626;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            text-shadow: none;
+            letter-spacing: 0.5px;
+        }
+
+        .quick-wins-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .quick-win-card {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            border-left: 5px solid #10b981;
+            transition: all 0.3s ease;
+        }
+
+        .quick-win-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .quick-win-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .quick-win-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #2c3e50;
+            flex: 1;
+            line-height: 1.3;
+        }
+
+        .effort-badge {
+            background: #10b981;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            white-space: nowrap;
+            margin-left: 0.5rem;
+        }
+
+        .quick-win-action {
+            font-size: 0.9rem;
+            color: #667eea;
+            font-weight: 600;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            border-radius: 8px;
+            line-height: 1.5;
+        }
+
+        .quick-win-impact {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .impact-item {
+            text-align: center;
+            padding: 0.75rem;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+
+        .impact-label {
+            font-size: 0.75rem;
+            color: #999;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .impact-value {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #667eea;
+            margin-top: 0.25rem;
+        }
+
+        .quick-win-action-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 700;
+            margin-top: 1rem;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .quick-win-action-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        /* Insights Grid */
+        .insights-section {
+            margin-bottom: 3rem;
+        }
+
+        .insights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .insight-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            text-align: center;
+            transition: all 0.3s ease;
+            border-top: 5px solid #667eea;
+        }
+
+        .insight-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        }
+
+        .insight-card.elasticity {
+            border-top-color: #06b6d4;
+        }
+
+        .insight-card.volatility {
+            border-top-color: #f97316;
+        }
+
+        .insight-card.peak {
+            border-top-color: #dc2626;
+        }
+
+        .insight-card.position {
+            border-top-color: #667eea;
+        }
+
+        .insight-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .insight-label {
+            font-size: 0.75rem;
+            color: #999;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .insight-value {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+
+        .insight-description {
+            font-size: 0.85rem;
+            color: #666;
+            line-height: 1.4;
+        }
+
+        /* Tabs */
+        .tabs-container {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            margin-bottom: 3rem;
+        }
+
+        .tabs-header {
+            display: flex;
+            border-bottom: 2px solid #e5e7eb;
+            background: #f9f9f9;
+            overflow-x: auto;
+        }
+
+        .tab-button {
+            padding: 1.2rem 1.5rem;
+            background: none;
+            border: none;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #999;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .tab-button:hover {
+            color: #667eea;
+        }
+
+        .tab-button.active {
+            color: #667eea;
+        }
+
+        .tab-button.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #667eea;
+        }
+
+        .tab-content {
+            padding: 2rem;
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Recommendations Grid */
+        .recommendations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .rec-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 2px solid #e5e7eb;
+            transition: all 0.3s ease;
+        }
+
+        .rec-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+            border-color: #667eea;
+        }
+
+        .rec-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .rec-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #2c3e50;
+            flex: 1;
+        }
+
+        .rec-badge {
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            white-space: nowrap;
+            margin-left: 0.5rem;
+            text-transform: uppercase;
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .rec-content {
+            font-size: 0.9rem;
+            color: #666;
+            margin: 1rem 0;
+            line-height: 1.6;
+        }
+
+        .rec-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .stat-box {
+            background: #f9f9f9;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-box-label {
+            font-size: 0.7rem;
+            color: #999;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-box-value {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #667eea;
+        }
+
+        /* Summary Banner */
+        .summary-banner {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            margin-bottom: 3rem;
+            border-left: 5px solid #667eea;
+        }
+
+        .summary-banner h3 {
+            color: #667eea;
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        .summary-text {
+            color: #555;
+            line-height: 1.8;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+        }
+
+        .summary-points {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .summary-point {
+            padding: 1rem;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            border-left: 3px solid #667eea;
+            border-radius: 8px;
+        }
+
+        .summary-point-text {
+            color: #2c3e50;
+            font-weight: 600;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        /* Info Box */
+        .info-box {
+            background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+            border-left: 5px solid #667eea;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin: 1.5rem 0;
+            color: #2c3e50;
+        }
+
+        .info-box strong {
+            color: #667eea;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: white;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .empty-state h2 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Footer */
+        .recommendations-footer {
+            background: #f9f9f9;
+            padding: 1.5rem;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #e5e7eb;
+            margin-top: 3rem;
+        }
+
+        @media (max-width: 1024px) {
+            .insights-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .recommendations-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .recommendations-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .insights-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .tabs-header {
+                overflow-x: auto;
+            }
+
+            .tab-button {
+                padding: 1rem 1rem;
+                font-size: 0.8rem;
+            }
+
+            .quick-wins-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .quick-win-impact {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📊 Sales Forecasting Hub</h1>
+        <ul class="nav-links">
+            <li><a href="/dashboard">Dashboard</a></li>
+            <li><a href="/upload">Upload</a></li>
+            <li><a href="/analysis">Analysis</a></li>
+            <li><a href="/forecast">Forecast</a></li>
+            <li><a href="/recommendation" class="active">Recommendations</a></li>
+            <li><a href="/logout">Logout</a></li>
+        </ul>
+    </header>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="recommendations-header">
+            <h1>💡 Smart Recommendations</h1>
+            <p>AI-powered insights to boost your sales and optimize operations</p>
+        </div>
+
+        <!-- Executive Summary Section -->
+        {% if recommendations.summary %}
+        <div class="summary-banner" style="background:linear-gradient(90deg,#e0f7fa 0%,#f1f8e9 100%);border-left:6px solid #10b981;">
+            <h3 style="color:#10b981;">🚀 Executive Summary</h3>
+            <div class="summary-text">{{ recommendations.summary.summary }}</div>
+            <div class="summary-points">
+                <div class="summary-point"><div class="summary-point-text">✅ <strong>Quick Wins:</strong> {{ recommendations.summary.key_insight_1 }}</div></div>
+                <div class="summary-point"><div class="summary-point-text">📊 <strong>Analytics:</strong> {{ recommendations.summary.key_insight_2 }}</div></div>
+                <div class="summary-point"><div class="summary-point-text">🎯 <strong>Strategy:</strong> {{ recommendations.summary.key_insight_3 }}</div></div>
+                <div class="summary-point"><div class="summary-point-text">🏆 <strong>Position:</strong> {{ recommendations.summary.key_insight_4 }}</div></div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if not quick_wins and not recommendations %}
+        <div class="empty-state">
+            <div class="empty-state-icon">📈</div>
+            <h2>No Recommendations Available Yet</h2>
+            <p>Upload and analyze your sales data to get personalized AI-powered recommendations</p>
+        </div>
+        {% else %}
+
+
+        <!-- Quick Wins Section -->
+        {% if quick_wins %}
+        <div class="quick-wins-section">
+            <div class="section-title">
+                ⚡ Quick Wins
+                <small>High Impact • Low Effort</small>
+            </div>
+
+            <div class="info-box">
+                <strong>📌 Quick Wins:</strong> These are immediate actions that require minimal effort but deliver rapid, measurable business impact.
+            </div>
+
+            <div class="quick-wins-grid">
+                {% for win in quick_wins %}
+                <div class="quick-win-card">
+                    <div class="quick-win-header">
+                        <div class="quick-win-title">{{ win.title }}</div>
+                        <div class="effort-badge">Easy</div>
+                    </div>
+
+                    <div class="quick-win-action">
+                        <strong>Action:</strong> {{ win.action }}
+                    </div>
+
+                    <div class="quick-win-impact">
+                        <div class="impact-item">
+                            <div class="impact-label">ROI Impact</div>
+                            <div class="impact-value">{{ win.roi_impact }}%</div>
+                        </div>
+                        <div class="impact-item">
+                            <div class="impact-label">Timeline</div>
+                            <div class="impact-value">{{ win.timeline }}</div>
+                        </div>
+                    </div>
+
+                    <button class="quick-win-action-btn" onclick="alert('Action: {{ win.action }}')">
+                        📌 Implement Now
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Monthly Stock Recommendations Table -->
+        {% if stock_recommendations %}
+        <div class="insights-section">
+            <div class="section-title">📦 Monthly Stock Actions for This Year</div>
+            <div class="info-box">
+                <strong>Stock Action Table:</strong> For each month, see whether to <span style="color:#10b981;font-weight:bold;">INCREASE</span>, <span style="color:#dc2626;font-weight:bold;">DECREASE</span>, or <span style="color:#667eea;font-weight:bold;">MAINTAIN</span> stock levels based on demand analysis.
+            </div>
+            <table style="width:100%;background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);margin-bottom:2rem;overflow:hidden;">
+                <thead style="background:#f9f9f9;">
+                    <tr>
+                        <th style="padding:0.75rem;">Month</th>
+                        <th style="padding:0.75rem;">Action</th>
+                        <th style="padding:0.75rem;">Recommendation</th>
+                        <th style="padding:0.75rem;">Expected Sales</th>
+                        <th style="padding:0.75rem;">% Change</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rec in stock_recommendations %}
+                    <tr>
+                        <td style="padding:0.75rem;">{{ rec.month }}</td>
+                        <td style="padding:0.75rem;font-weight:bold;color:
+                            {% if rec.action == 'INCREASE' %}#10b981{% elif rec.action == 'DECREASE' %}#dc2626{% else %}#667eea{% endif %};">
+                            {{ rec.action }}
+                        </td>
+                        <td style="padding:0.75rem;">{{ rec.recommendation }}</td>
+                        <td style="padding:0.75rem;">{{ rec.expected_sales }}</td>
+                        <td style="padding:0.75rem;">{{ rec.percentage_change }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Festival/Event Discount Recommendations -->
+        {% if festival_recommendations %}
+        <div class="insights-section">
+            <div class="section-title">🎉 Festival & Event Discount Recommendations</div>
+            <div class="info-box">
+                <strong>Festival Promotions:</strong> Targeted discounts and stock actions for major Indian festivals. <span style="color:#ff9800;font-weight:bold;">Plan campaigns early for maximum impact!</span>
+            </div>
+            <table style="width:100%;background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);margin-bottom:2rem;overflow:hidden;">
+                <thead style="background:#f9f9f9;">
+                    <tr>
+                        <th style="padding:0.75rem;">Month</th>
+                        <th style="padding:0.75rem;">Festival/Event</th>
+                        <th style="padding:0.75rem;">Discount <span title="Recommended Discount" style="color:#43a047;">%</span></th>
+                        <th style="padding:0.75rem;">Stock <span title="Recommended Stock Increase" style="color:#1976d2;">↑%</span></th>
+                        <th style="padding:0.75rem;">Intensity</th>
+                        <th style="padding:0.75rem;">Sales Lift</th>
+                        <th style="padding:0.75rem;">Message</th>
+                        <th style="padding:0.75rem;">Timing</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rec in festival_recommendations %}
+                    <tr style="background:{% if rec.campaign_intensity == 'AGGRESSIVE' %}#fff3e0{% elif rec.campaign_intensity == 'STANDARD' %}#e3f2fd{% else %}#fff{% endif %};">
+                        <td style="padding:0.75rem;font-weight:bold;">{{ rec.month }}</td>
+                        <td style="padding:0.75rem;font-weight:bold;">{{ rec.festival_name }}</td>
+                        <td style="padding:0.75rem;color:#43a047;font-weight:bold;">{{ rec.recommended_discount }}%</td>
+                        <td style="padding:0.75rem;color:#1976d2;font-weight:bold;">{{ rec.stock_increase_percent }}%</td>
+                        <td style="padding:0.75rem;">
+                            <span class="rec-badge" style="background:{% if rec.campaign_intensity == 'AGGRESSIVE' %}#ff9800{% else %}#2196f3{% endif %};color:white;">{{ rec.campaign_intensity }}</span>
+                        </td>
+                        <td style="padding:0.75rem;">+{{ rec.expected_sales_lift }}%</td>
+                        <td style="padding:0.75rem;">{{ rec.promotional_message }}</td>
+                        <td style="padding:0.75rem;">{{ rec.implementation_timing }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Insights Section -->
+        <div class="insights-section">
+            <div class="section-title">📊 Key Insights</div>
+
+            <div class="info-box">
+                <strong>📌 Insights Dashboard:</strong> Get a quick overview of important business metrics derived from your sales data.
+            </div>
+
+            <div class="insights-grid">
+                {% if insights.elasticity %}
+                <div class="insight-card elasticity">
+                    <div class="insight-icon">💰</div>
+                    <div class="insight-label">Price Elasticity</div>
+                    <div class="insight-value">{{ insights.elasticity.value }}</div>
+                    <div class="insight-description">{{ insights.elasticity.description }}</div>
+                </div>
+                {% endif %}
+
+                {% if insights.volatility %}
+                <div class="insight-card volatility">
+                    <div class="insight-icon">📈</div>
+                    <div class="insight-label">Sales Volatility</div>
+                    <div class="insight-value">{{ insights.volatility.value }}</div>
+                    <div class="insight-description">{{ insights.volatility.description }}</div>
+                </div>
+                {% endif %}
+
+                {% if insights.peak %}
+                <div class="insight-card peak">
+                    <div class="insight-icon">⛰️</div>
+                    <div class="insight-label">Peak Season</div>
+                    <div class="insight-value">{{ insights.peak.value }}</div>
+                    <div class="insight-description">{{ insights.peak.description }}</div>
+                </div>
+                {% endif %}
+
+                {% if insights.position %}
+                <div class="insight-card position">
+                    <div class="insight-icon">🎯</div>
+                    <div class="insight-label">Market Position</div>
+                    <div class="insight-value">{{ insights.position.value }}</div>
+                    <div class="insight-description">{{ insights.position.description }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Recommendations Tabs -->
+        {% if recommendations %}
+        <div class="tabs-container">
+            <div class="tabs-header">
+                {% if recommendations.inventory %}
+                <button class="tab-button active" onclick="switchTab(event, 'inventory')">📦 Inventory Optimization</button>
+                {% endif %}
+                {% if recommendations.revenue %}
+                <button class="tab-button" onclick="switchTab(event, 'revenue')">💵 Revenue Optimization</button>
+                {% endif %}
+                {% if recommendations.competitive %}
+                <button class="tab-button" onclick="switchTab(event, 'competitive')">🎯 Competitive Positioning</button>
+                {% endif %}
+                {% if recommendations.operations %}
+                <button class="tab-button" onclick="switchTab(event, 'operations')">⚙️ Operations</button>
+                {% endif %}
+            </div>
+
+            <!-- Inventory Tab -->
+            {% if recommendations.inventory %}
+            <div id="inventory" class="tab-content active">
+                <h3 style="margin-bottom: 1.5rem; color: #2c3e50;">📦 Inventory Optimization Strategies</h3>
+                <div class="recommendations-grid">
+                    {% for rec in recommendations.inventory %}
+                    <div class="rec-card">
+                        <div class="rec-header">
+                            <div class="rec-title">{{ rec.title }}</div>
+                            <div class="rec-badge">{{ rec.type }}</div>
+                        </div>
+                        <div class="rec-content">{{ rec.description }}</div>
+                        <div class="rec-stats">
+                            <div class="stat-box">
+                                <div class="stat-box-label">Impact</div>
+                                <div class="stat-box-value">{{ rec.impact }}</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-box-label">Timeline</div>
+                                <div class="stat-box-value">{{ rec.timeline }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Revenue Tab -->
+            {% if recommendations.revenue %}
+            <div id="revenue" class="tab-content">
+                <h3 style="margin-bottom: 1.5rem; color: #2c3e50;">💵 Revenue Optimization Strategies</h3>
+                <div class="recommendations-grid">
+                    {% for rec in recommendations.revenue %}
+                    <div class="rec-card">
+                        <div class="rec-header">
+                            <div class="rec-title">{{ rec.title }}</div>
+                            <div class="rec-badge">{{ rec.type }}</div>
+                        </div>
+                        <div class="rec-content">{{ rec.description }}</div>
+                        <div class="rec-stats">
+                            <div class="stat-box">
+                                <div class="stat-box-label">ROI</div>
+                                <div class="stat-box-value">{{ rec.roi }}</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-box-label">Effort</div>
+                                <div class="stat-box-value">{{ rec.effort }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Competitive Tab -->
+            {% if recommendations.competitive %}
+            <div id="competitive" class="tab-content">
+                <h3 style="margin-bottom: 1.5rem; color: #2c3e50;">🎯 Competitive Positioning</h3>
+                <div class="recommendations-grid">
+                    {% for rec in recommendations.competitive %}
+                    <div class="rec-card">
+                        <div class="rec-header">
+                            <div class="rec-title">{{ rec.title }}</div>
+                            <div class="rec-badge">{{ rec.type }}</div>
+                        </div>
+                        <div class="rec-content">{{ rec.description }}</div>
+                        <div class="rec-stats">
+                            <div class="stat-box">
+                                <div class="stat-box-label">Strength</div>
+                                <div class="stat-box-value">{{ rec.strength }}</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-box-label">Priority</div>
+                                <div class="stat-box-value">{{ rec.priority }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Operations Tab -->
+            {% if recommendations.operations %}
+            <div id="operations" class="tab-content">
+                <h3 style="margin-bottom: 1.5rem; color: #2c3e50;">⚙️ Operational Improvements</h3>
+                <div class="recommendations-grid">
+                    {% for rec in recommendations.operations %}
+                    <div class="rec-card">
+                        <div class="rec-header">
+                            <div class="rec-title">{{ rec.title }}</div>
+                            <div class="rec-badge">{{ rec.type }}</div>
+                        </div>
+                        <div class="rec-content">{{ rec.description }}</div>
+                        <div class="rec-stats">
+                            <div class="stat-box">
+                                <div class="stat-box-label">Efficiency</div>
+                                <div class="stat-box-value">{{ rec.efficiency }}</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-box-label">Complexity</div>
+                                <div class="stat-box-value">{{ rec.complexity }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Summary Banner -->
+        {% if recommendations.summary %}
+        <div class="summary-banner">
+            <h3>📋 Executive Summary</h3>
+            <div class="summary-text">{{ recommendations.summary }}</div>
+            <div class="summary-points">
+                <div class="summary-point">
+                    <div class="summary-point-text">✅ <strong>Quick Wins:</strong> Implement 2-3 easy actions immediately for quick wins</div>
+                </div>
+                <div class="summary-point">
+                    <div class="summary-point-text">📊 <strong>Analytics:</strong> Monitor KPIs weekly to track progress</div>
+                </div>
+                <div class="summary-point">
+                    <div class="summary-point-text">🎯 <strong>Strategy:</strong> Align recommendations with your business goals</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% endif %}
+    </div>
+
+    <div class="recommendations-footer">
+        <p>💡 <strong>Seasonal Sales Forecasting System</strong> - Powered by Advanced Analytics</p>
+        <p style="margin-top: 0.5rem; font-size: 0.9rem;">All recommendations are based on comprehensive data analysis and industry best practices</p>
+    </div>
+
+    <script>
+        function switchTab(event, tabName) {
+            event.preventDefault();
+            
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+    </script>
+
+    <footer>
+        <p>&copy; 2024 <strong>Seasonal Sales Forecasting System</strong> - Advanced Analytics & AI Recommendations | All Rights Reserved</p>
+    </footer>
+</body>
+</html>

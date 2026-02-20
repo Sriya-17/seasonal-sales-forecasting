@@ -340,22 +340,44 @@
                 </div>
             </div>
             
-            <!-- Forecast Statistics -->
-            <div class="forecast-card">
-                <div class="forecast-card-header">
-                    <h3>📊 Forecast Statistics</h3>
-                    <p>Distribution, trends, and summary metrics for the forecast period</p>
+           <!-- Forecast Statistics -->
+<div class="forecast-card">
+    <div class="forecast-card-header">
+        <h3>📊 Forecast Statistics</h3>
+        <p>Distribution, trends, and summary metrics for the forecast period</p>
+    </div>
+    <div class="forecast-card-body">
+        {% if forecast_statistics %}
+            <img src="/static/plots/forecast_statistics.png?t={{ now }}" class="forecast-image" alt="Forecast Statistics">
+
+            <!-- 🔥 ADD THIS BLOCK HERE -->
+            <div class="stats-grid" style="margin-top:20px;">
+                <div class="stat-box">
+                    <h4>Model Used</h4>
+                    <p>{{ model_used }}</p>
                 </div>
-                <div class="forecast-card-body">
-                    {% if forecast_statistics %}
-                        <img src="/static/plots/forecast_statistics.png?t={{ now }}" class="forecast-image" alt="Forecast Statistics">
-                    {% else %}
-                        <div class="chart-placeholder">
-                            <p>Visualization will appear here</p>
-                        </div>
-                    {% endif %}
+                <div class="stat-box">
+                    <h4>RMSE</h4>
+                    <p>{{ rmse }}</p>
+                </div>
+                <div class="stat-box">
+                    <h4>MAE</h4>
+                    <p>{{ mae }}</p>
+                </div>
+                <div class="stat-box">
+                    <h4>Generated At</h4>
+                    <p>{{ generated_time }}</p>
                 </div>
             </div>
+
+        {% else %}
+            <div class="chart-placeholder">
+                <p>Visualization will appear here</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
             
             <!-- Scenario Analysis -->
             {% if scenario_comparison %}
@@ -431,5 +453,8 @@
         // Update timestamp
         document.getElementById('generated-time').textContent = new Date().toLocaleString();
     </script>
+    <footer>
+      <p>&copy; 2026 <strong>Seasonal Sales Forecasting System</strong> - Powered by Advanced ARIMA Analytics | All Rights Reserved</p>
+    </footer>
 </body>
 </html>

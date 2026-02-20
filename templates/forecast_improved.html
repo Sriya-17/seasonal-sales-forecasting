@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Forecast - Seasonal Sales Forecasting</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .forecast-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 3rem 2.5rem;
+            border-radius: 12px;
+            margin-bottom: 2.5rem;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .forecast-header h1 {
+            font-size: 2.2rem;
+            margin-bottom: 0.75rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .forecast-header p {
+            opacity: 0.92;
+            font-size: 1.05rem;
+            font-weight: 400;
+            letter-spacing: -0.2px;
+        }
+
+        .forecast-controls {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .forecast-controls button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.95rem;
+        }
+
+        .forecast-controls .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .forecast-controls .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .forecast-controls .btn-secondary {
+            background: #e5e7eb;
+            color: #2c3e50;
+            transition: all 0.3s ease;
+        }
+
+        .forecast-controls .btn-secondary:hover {
+            background: #d1d5db;
+        }
+
+        #status {
+            margin-left: auto;
+            font-weight: 700;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+        }
+
+        #status.loading {
+            color: #667eea;
+        }
+
+        #status.success {
+            color: #10b981;
+            background: #ecfdf5;
+        }
+
+        #status.error {
+            color: #dc2626;
+            background: #fef2f2;
+        }
+
+        /* Forecast Cards */
+        .forecast-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            margin-bottom: 2rem;
+            transition: all 0.3s ease;
+            border: 1px solid #e8e8e8;
+        }
+
+        .forecast-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+        }
+
+        .forecast-card-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 2rem;
+        }
+
+        .forecast-card-header h3 {
+            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .forecast-card-header p {
+            font-size: 0.95rem;
+            opacity: 0.9;
+        }
+
+        .forecast-card-body {
+            padding: 2.5rem;
+        }
+
+        .forecast-image {
+            width: 100%;
+            height: auto;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+            display: block;
+            object-fit: cover;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            border: 1px solid #e8e8e8;
+            border-left: 4px solid #2c3e50;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border-left-color: #34495e;
+        }
+
+        .stat-card-label {
+            color: #777;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+        }
+
+        .stat-card-value {
+            color: #2c3e50;
+            font-size: 2rem;
+            font-weight: 800;
+            margin-top: 1rem;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Scenario Comparison */
+        .scenario-comparison {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .scenario-box {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 2rem;
+            border-radius: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 2px solid #e8e8e8;
+        }
+
+        .scenario-box:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .scenario-box.baseline {
+            background: linear-gradient(135deg, #dbeafe 0%, #e8f4f8 100%);
+            border-color: #0891b2;
+        }
+
+        .scenario-box.pessimistic {
+            background: linear-gradient(135deg, #fed7aa 0%, #fed8a0 100%);
+            border-color: #ea580c;
+        }
+
+        .scenario-box.optimistic {
+            background: linear-gradient(135deg, #d1fae5 0%, #d1f5e8 100%);
+            border-color: #059669;
+        }
+
+        .scenario-box h4 {
+            font-size: 1.1rem;
+            margin-bottom: 0.75rem;
+            color: #2c3e50;
+            font-weight: 700;
+        }
+
+        .scenario-box p {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 1rem;
+        }
+
+        .scenario-value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #2c3e50;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Info Box */
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #2c3e50;
+            padding: 1.5rem 1.75rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            color: #444;
+            border: 1px solid #e8e8e8;
+        }
+
+        .info-box strong {
+            color: #2c3e50;
+        }
+
+        .forecast-placeholder {
+            background: #f9f9f9;
+            border: 2px dashed #e5e7eb;
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            color: #999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .forecast-placeholder svg {
+            width: 60px;
+            height: 60px;
+            opacity: 0.5;
+        }
+
+        .forecast-footer {
+            background: #f9f9f9;
+            padding: 1.5rem;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #e5e7eb;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 1024px) {
+            .scenario-comparison {
+                grid-template-columns: 1fr;
+            }
+
+            #status {
+                margin-left: 0;
+                margin-top: 0.5rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .forecast-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .forecast-controls {
+                flex-direction: column;
+            }
+
+            .forecast-controls button {
+                width: 100%;
+            }
+
+            #status {
+                width: 100%;
+                text-align: center;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .scenario-comparison {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📊 Sales Forecasting Hub</h1>
+        <ul class="nav-links">
+            <li><a href="/dashboard">Dashboard</a></li>
+            <li><a href="/upload">Upload</a></li>
+            <li><a href="/analysis">Analysis</a></li>
+            <li><a href="/forecast" class="active">Forecast</a></li>
+            <li><a href="/recommendation">Recommendations</a></li>
+            <li><a href="/logout">Logout</a></li>
+        </ul>
+    </header>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="forecast-header">
+            <h1>📊 Sales Forecast Visualization</h1>
+            <p>Historical data & future predictions with confidence intervals and scenario analysis</p>
+            <div class="info-box" style="margin-top:1.5rem;background:linear-gradient(90deg,#e0f7fa 0%,#f1f8e9 100%);border-left:6px solid #10b981;">
+                <strong>What does this mean for you?</strong> Use these forecasts to plan inventory, staffing, and promotions. <span style="color:#ff9800;">Pay special attention to months with high predicted sales or wide confidence intervals.</span>
+            </div>
+            <div style="margin-top:1.5rem;display:flex;align-items:center;gap:1.5rem;">
+                <button class="btn-primary" onclick="downloadForecast()">⬇️ Download Forecast Data (CSV)</button>
+                <span style="font-size:0.95rem;color:#555;">Data source: <strong>User uploaded file</strong></span>
+                <span style="font-size:0.95rem;color:#888;">Last updated: <span id="last-updated">{{ generated_time }}</span></span>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="forecast-controls">
+            <button class="btn-primary" onclick="generateVisualizations()">⚡ Generate All Visualizations</button>
+            <button class="btn-secondary" onclick="refreshPage()">🔄 Refresh</button>
+            <span id="status"></span>
+        </div>
+
+        <!-- Historical vs Forecast -->
+        <div class="forecast-card">
+            <div class="forecast-card-header">
+                <h3>📈 Historical vs Forecast</h3>
+                <p>Blue line: Historical sales | Red line: Predicted sales</p>
+            </div>
+            <div class="forecast-card-body">
+                <div class="info-box">
+                    <strong>📌 What this shows:</strong> Comparison between your actual historical sales (blue) and our AI-powered forecast (red) for the next period.
+                </div>
+                {% if historical_vs_forecast %}
+                    <img src="/static/plots/historical_vs_forecast.png?t={{ now }}" class="forecast-image" alt="Historical vs Forecast">
+                    <div class="stats-grid">
+                        <div class="stat-card" title="Average of all forecasted values">
+                            <div class="stat-card-label">📊 Mean Forecast <span style="cursor:help;" title="Average of all forecasted values">&#9432;</span></div>
+                            <div class="stat-card-value">${{ "{:,.0f}".format(forecast_mean) }}</div>
+                        </div>
+                        <div class="stat-card" title="Lowest forecasted value">
+                            <div class="stat-card-label">📉 Min Forecast <span style="cursor:help;" title="Lowest forecasted value">&#9432;</span></div>
+                            <div class="stat-card-value">${{ "{:,.0f}".format(forecast_min) }}</div>
+                        </div>
+                        <div class="stat-card" title="Highest forecasted value">
+                            <div class="stat-card-label">📈 Max Forecast <span style="cursor:help;" title="Highest forecasted value">&#9432;</span></div>
+                            <div class="stat-card-value">${{ "{:,.0f}".format(forecast_max) }}</div>
+                        </div>
+                        <div class="stat-card" title="Number of months forecasted">
+                            <div class="stat-card-label">📅 Forecast Periods <span style="cursor:help;" title="Number of months forecasted">&#9432;</span></div>
+                            <div class="stat-card-value">{{ forecast_periods }}</div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="forecast-placeholder">
+                        <p>Click "Generate All Visualizations" to create forecast charts</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Confidence Intervals -->
+        <div class="forecast-card">
+            <div class="forecast-card-header">
+                <h3>🎯 Forecast with Confidence Intervals</h3>
+                <p>Light blue areas show uncertainty ranges - 95% CI (outer) and 68% CI (inner)</p>
+            </div>
+            <div class="forecast-card-body">
+                <div class="info-box">
+                    <strong>📌 Understanding confidence intervals:</strong> Wider bands indicate more uncertainty. Use these ranges for risk planning and resource allocation.
+                </div>
+                {% if confidence_intervals %}
+                    <img src="/static/plots/confidence_intervals.png?t={{ now }}" class="forecast-image" alt="Confidence Intervals">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-card-label">🛡️ Confidence Level</div>
+                            <div class="stat-card-value">95%</div>
+                        </div>
+                        <div class="stat-card" title="Average width of the 95% confidence interval">
+                            <div class="stat-card-label">📏 Avg CI Width <span style="cursor:help;" title="Average width of the 95% confidence interval">&#9432;</span></div>
+                            <div class="stat-card-value">${{ "{:,.0f}".format(ci_avg_width) }}</div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="forecast-placeholder">
+                        <p>Visualization will appear here after generating</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Forecast Statistics -->
+        <div class="forecast-card">
+            <div class="forecast-card-header">
+                <h3>📊 Forecast Statistics</h3>
+                <p>Distribution, trends, and summary metrics for the forecast period</p>
+            </div>
+            <div class="forecast-card-body">
+                <div class="info-box">
+                    <strong>📌 Model Performance:</strong> RMSE and MAE measure prediction accuracy. Lower values indicate better model fit.
+                </div>
+                {% if forecast_statistics %}
+                    <img src="/static/plots/forecast_statistics.png?t={{ now }}" class="forecast-image" alt="Forecast Statistics">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-card-label">🤖 Model Used</div>
+                            <div class="stat-card-value">{{ model_used }}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card-label">📐 RMSE</div>
+                            <div class="stat-card-value">{{ rmse }}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card-label">📏 MAE</div>
+                            <div class="stat-card-value">{{ mae }}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card-label">⏰ Generated</div>
+                            <div class="stat-card-value">{{ generated_time }}</div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="forecast-placeholder">
+                        <p>Visualization will appear here after generating</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Scenario Analysis -->
+        {% if scenario_comparison %}
+        <div class="forecast-card">
+            <div class="forecast-card-header">
+                <h3>🎬 Scenario Analysis</h3>
+                <p>Plan for multiple outcomes: Standard forecast, Pessimistic (-5%), and Optimistic (+5%)</p>
+            </div>
+            <div class="forecast-card-body">
+                <div class="info-box">
+                    <strong>📌 Scenario Planning:</strong> Use these scenarios to develop contingency plans and understand your business risk profile.
+                </div>
+
+                <img src="/static/plots/scenario_comparison.png?t={{ now }}" class="forecast-image" alt="Scenario Comparison">
+                
+                <h4 style="margin-top: 2rem; margin-bottom: 1.5rem; color: #2c3e50; font-size: 1.1rem; font-weight: 700;">Scenario Summary</h4>
+                <div class="scenario-comparison">
+                    <div class="scenario-box baseline">
+                        <h4>📊 Baseline</h4>
+                        <p>Standard Forecast</p>
+                        <div class="scenario-value">${{ "{:,.0f}".format(baseline_mean) }}</div>
+                    </div>
+                    <div class="scenario-box pessimistic">
+                        <h4>⚠️ Pessimistic</h4>
+                        <p>-5% Growth Scenario</p>
+                        <div class="scenario-value">${{ "{:,.0f}".format(pessimistic_mean) }}</div>
+                    </div>
+                    <div class="scenario-box optimistic">
+                        <h4>✨ Optimistic</h4>
+                        <p>+5% Growth Scenario</p>
+                        <div class="scenario-value">${{ "{:,.0f}".format(optimistic_mean) }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="forecast-footer">
+        <p><strong>Generated:</strong> <span id="generated-time">{{ generated_time }}</span></p>
+        <p style="margin-top: 0.5rem;">Data based on ARIMA model with 95% confidence intervals. <span style="color:#43a047;">All predictions use your uploaded data.</span></p>
+    </div>
+
+    <script>
+        function downloadForecast() {
+            window.location.href = '/api/forecast-data?download=1';
+        }
+        // ...existing code...
+    </script>
+
+    <script>
+        function generateVisualizations() {
+            const status = document.getElementById('status');
+            status.textContent = '⏳ Generating...';
+            status.className = 'loading';
+            
+            fetch('/api/visualizations/generate', { method: 'GET' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        status.textContent = '✅ Generated successfully!';
+                        status.className = 'success';
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        status.textContent = '❌ Error: ' + (data.error || 'Unknown error');
+                        status.className = 'error';
+                    }
+                })
+                .catch(error => {
+                    status.textContent = '❌ Error: ' + error.message;
+                    status.className = 'error';
+                });
+        }
+        
+        function refreshPage() {
+            location.reload();
+        }
+        
+        document.getElementById('generated-time').textContent = new Date().toLocaleString();
+    </script>
+
+    <footer>
+        <p>&copy; 2024 <strong>Seasonal Sales Forecasting System</strong> - Advanced ARIMA Analytics | All Rights Reserved</p>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Sales Forecast - Seasonal Sales Forecasting</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.0.0/dist/chartjs-plugin-annotation.js"></script>
+    <style>
+        .forecast-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem 2.5rem;
+            border-radius: 12px;
+            margin-bottom: 2.5rem;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .forecast-header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .forecast-header p {
+            opacity: 0.95;
+            font-size: 1.1rem;
+            font-weight: 400;
+        }
+
+        .main-chart-container {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            margin-bottom: 2.5rem;
+            position: relative;
+        }
+
+        .main-chart-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+
+        .main-chart-subtitle {
+            color: #777;
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 400px;
+            margin-bottom: 1.5rem;
+        }
+
+        .legend-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
+        .legend-historical { background: #4f46e5; }
+        .legend-forecast { background: #ef4444; }
+        .legend-upper { background: #f87171; opacity: 0.3; }
+        .legend-lower { background: #f87171; opacity: 0.3; }
+
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            color: #2c3e50;
+            font-size: 1.75rem;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+
+        .insights-section {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2.5rem;
+        }
+
+        .insights-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 1rem;
+        }
+
+        .insights-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .insights-list li {
+            padding: 0.75rem 0;
+            color: #555;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .insights-list li:last-child {
+            border-bottom: none;
+        }
+
+        .insights-list li:before {
+            content: "✓ ";
+            color: #667eea;
+            font-weight: 700;
+            margin-right: 0.5rem;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #2c3e50;
+        }
+
+        .btn-secondary:hover {
+            background: #d1d5db;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 0.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-box {
+            background: #fee2e2;
+            border-left: 4px solid #ef4444;
+            padding: 1rem;
+            border-radius: 8px;
+            color: #991b1b;
+            margin-bottom: 1.5rem;
+        }
+
+        .success-box {
+            background: #dcfce7;
+            border-left: 4px solid #22c55e;
+            padding: 1rem;
+            border-radius: 8px;
+            color: #15803d;
+            margin-bottom: 1.5rem;
+        }
+
+        .forecast-footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: #666;
+            font-size: 0.9rem;
+            border-top: 1px solid #e5e7eb;
+            margin-top: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .forecast-header h1 {
+                font-size: 1.8rem;
+            }
+
+            .chart-wrapper {
+                height: 300px;
+            }
+
+            .stats-container {
+                grid-template-columns: 1fr;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📊 Sales Forecasting Hub</h1>
+        <ul class="nav-links">
+            <li><a href="/dashboard">Dashboard</a></li>
+            <li><a href="/upload">Upload</a></li>
+            <li><a href="/analysis">Analysis</a></li>
+            <li><a href="/forecast" class="active">Forecast</a></li>
+            <li><a href="/recommendation">Recommendations</a></li>
+            <li><a href="/logout">Logout</a></li>
+        </ul>
+    </header>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="forecast-header">
+            <h1>📈 Interactive Sales Forecast</h1>
+            <p>Visualize historical trends and future predictions with confidence intervals</p>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <button class="btn btn-primary" onclick="generateForecast()">🚀 Generate Forecast</button>
+            <button class="btn btn-secondary" onclick="downloadCSV()">⬇️ Download as CSV</button>
+            <button class="btn btn-secondary" onclick="location.reload()">🔄 Refresh</button>
+            <span id="status"></span>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="messages"></div>
+
+        <!-- Main Chart -->
+        <div class="main-chart-container" id="chartContainer" style="display:none;">
+            <div class="main-chart-title">Historical vs Forecast</div>
+            <div class="main-chart-subtitle">Blue: Historical Data | Red: Forecast | Light Red: Confidence Interval (±95%)</div>
+            <div class="chart-wrapper">
+                <canvas id="forecastChart"></canvas>
+            </div>
+            <div class="legend-info">
+                <div class="legend-item">
+                    <div class="legend-color legend-historical"></div>
+                    <span>Historical Sales Data</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color legend-forecast"></div>
+                    <span>Forecasted Sales</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color legend-upper"></div>
+                    <span>95% Confidence Interval</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="stats-container" id="statsContainer" style="display:none;">
+            <div class="stat-box">
+                <div class="stat-label">Historical Avg</div>
+                <div class="stat-value" id="historicalAvg">-</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Forecast Avg</div>
+                <div class="stat-value" id="forecastAvg">-</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Max Predicted</div>
+                <div class="stat-value" id="maxForecast">-</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Min Predicted</div>
+                <div class="stat-value" id="minForecast">-</div>
+            </div>
+        </div>
+
+        <!-- Insights -->
+        <div class="insights-section" id="insightsSection" style="display:none;">
+            <div class="insights-title">📊 Forecast Insights</div>
+            <ul class="insights-list" id="insightsList"></ul>
+        </div>
+
+        <!-- Footer -->
+        <div class="forecast-footer">
+            <p>Last Updated: <span id="lastUpdated">{{ generated_time }}</span></p>
+            <p>Data Source: User Uploaded File | Model: ARIMA</p>
+        </div>
+    </div>
+
+    <script>
+        let chart = null;
+
+        async function generateForecast() {
+            const statusEl = document.getElementById('status');
+            const messagesEl = document.getElementById('messages');
+            const chartContainer = document.getElementById('chartContainer');
+            const statsContainer = document.getElementById('statsContainer');
+            const insightsSection = document.getElementById('insightsSection');
+
+            statusEl.textContent = '';
+            messagesEl.innerHTML = '';
+            const spinner = '<span class="loading-spinner"></span>';
+
+            try {
+                statusEl.innerHTML = 'Generating forecast' + spinner;
+
+                // Fetch data from backend
+                const response = await fetch('/api/get-forecast-data');
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to generate forecast');
+                }
+
+                // Update UI with data
+                renderChart(data);
+                updateStatistics(data);
+                generateInsights(data);
+
+                chartContainer.style.display = 'block';
+                statsContainer.style.display = 'grid';
+                insightsSection.style.display = 'block';
+
+                statusEl.textContent = '✓ Forecast generated successfully!';
+                statusEl.style.color = '#22c55e';
+                messagesEl.innerHTML = `<div class="success-box">Forecast generated using your uploaded data. Review the visualizations and insights below.</div>`;
+
+            } catch (error) {
+                console.error('Error:', error);
+                statusEl.textContent = '✗ Error generating forecast';
+                statusEl.style.color = '#ef4444';
+                messagesEl.innerHTML = `<div class="error-box"><strong>Error:</strong> ${error.message}</div>`;
+            }
+        }
+
+        function renderChart(data) {
+            const ctx = document.getElementById('forecastChart').getContext('2d');
+            
+            // Combine historical and forecast data
+            const allDates = [...data.historical_dates, ...data.forecast_dates];
+            const historicalValues = data.historical_values;
+            const forecastValues = data.forecast_values;
+            const upperCI = data.upper_ci;
+            const lowerCI = data.lower_ci;
+
+            // Create dataset for historical data
+            const historicalData = historicalValues.map((val, i) => ({x: data.historical_dates[i], y: val}));
+            
+            // Create dataset for forecast data
+            const forecastData = forecastValues.map((val, i) => ({x: data.forecast_dates[i], y: val}));
+            
+            // Upper and lower CI for forecast
+            const upperCIData = upperCI.map((val, i) => ({x: data.forecast_dates[i], y: val}));
+            const lowerCIData = lowerCI.map((val, i) => ({x: data.forecast_dates[i], y: val}));
+
+            if (chart) {
+                chart.destroy();
+            }
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: allDates,
+                    datasets: [
+                        // Historical data
+                        {
+                            label: 'Historical Sales',
+                            data: historicalData,
+                            borderColor: '#4f46e5',
+                            backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#4f46e5',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointHoverRadius: 6,
+                        },
+                        // Forecast data
+                        {
+                            label: 'Forecast Sales',
+                            data: forecastData,
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            borderWidth: 3,
+                            borderDash: [5, 5],
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#ef4444',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointHoverRadius: 6,
+                        },
+                        // Upper confidence interval
+                        {
+                            label: 'Upper Confidence Interval',
+                            data: upperCIData,
+                            borderColor: 'rgba(239, 68, 68, 0.3)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            borderWidth: 1,
+                            borderDash: [3, 3],
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 0,
+                            pointHoverRadius: 0,
+                        },
+                        // Lower confidence interval
+                        {
+                            label: 'Lower Confidence Interval',
+                            data: lowerCIData,
+                            borderColor: 'rgba(239, 68, 68, 0.3)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            borderWidth: 1,
+                            borderDash: [3, 3],
+                            fill: '-1',
+                            tension: 0.3,
+                            pointRadius: 0,
+                            pointHoverRadius: 0,
+                        },
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: { size: 13, weight: '600' },
+                                padding: 15,
+                                usePointStyle: true,
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: { size: 13, weight: '600' },
+                            bodyFont: { size: 12 },
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': $' + context.parsed.y.toFixed(0);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                },
+                                font: { size: 11 }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)',
+                                drawBorder: true
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                font: { size: 11 },
+                                maxTicksLimit: 10,
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateStatistics(data) {
+            const historicalAvg = (data.historical_values.reduce((a, b) => a + b, 0) / data.historical_values.length).toFixed(0);
+            const forecastAvg = (data.forecast_values.reduce((a, b) => a + b, 0) / data.forecast_values.length).toFixed(0);
+            const maxForecast = Math.max(...data.forecast_values).toFixed(0);
+            const minForecast = Math.min(...data.forecast_values).toFixed(0);
+
+            document.getElementById('historicalAvg').textContent = '$' + parseInt(historicalAvg).toLocaleString();
+            document.getElementById('forecastAvg').textContent = '$' + parseInt(forecastAvg).toLocaleString();
+            document.getElementById('maxForecast').textContent = '$' + parseInt(maxForecast).toLocaleString();
+            document.getElementById('minForecast').textContent = '$' + parseInt(minForecast).toLocaleString();
+        }
+
+        function generateInsights(data) {
+            const insights = [];
+            
+            const historicalAvg = data.historical_values.reduce((a, b) => a + b, 0) / data.historical_values.length;
+            const forecastAvg = data.forecast_values.reduce((a, b) => a + b, 0) / data.forecast_values.length;
+            const trend = ((forecastAvg - historicalAvg) / historicalAvg * 100).toFixed(1);
+
+            if (trend > 5) {
+                insights.push(`📈 <strong>Growth Predicted:</strong> Forecast shows ${trend}% increase compared to historical average`);
+            } else if (trend < -5) {
+                insights.push(`📉 <strong>Decline Predicted:</strong> Forecast shows ${Math.abs(trend)}% decrease compared to historical average`);
+            } else {
+                insights.push(`➡️ <strong>Stable Trend:</strong> Forecast shows ${Math.abs(trend)}% change - relatively stable`);
+            }
+
+            const standardDeviation = Math.sqrt(data.forecast_values.reduce((sq, n) => sq + Math.pow(n - forecastAvg, 2), 0) / data.forecast_values.length);
+            const volatility = (standardDeviation / forecastAvg * 100).toFixed(1);
+
+            if (volatility > 15) {
+                insights.push(`⚠️ <strong>High Volatility:</strong> ${volatility}% variation in forecast - prepare for fluctuations`);
+            } else {
+                insights.push(`✅ <strong>Stable Forecast:</strong> ${volatility}% variation - relatively consistent sales expected`);
+            }
+
+            const maxMonthIdx = data.forecast_values.indexOf(Math.max(...data.forecast_values));
+            insights.push(`🎯 <strong>Peak Month:</strong> ${data.forecast_dates[maxMonthIdx]} - Expected peak sales`);
+
+            const minMonthIdx = data.forecast_values.indexOf(Math.min(...data.forecast_values));
+            insights.push(`🔍 <strong>Low Month:</strong> ${data.forecast_dates[minMonthIdx]} - Plan inventory accordingly`);
+
+            insights.push(`📊 <strong>Data Quality:</strong> Using your uploaded data (${data.historical_dates.length} months history) for predictions`);
+
+            const insightsList = document.getElementById('insightsList');
+            insightsList.innerHTML = insights.map(i => `<li>${i}</li>`).join('');
+        }
+
+        async function downloadCSV() {
+            try {
+                window.location.href = '/api/forecast-data?download=1';
+            } catch (error) {
+                alert('Error downloading CSV: ' + error.message);
+            }
+        }
+
+        // Auto-generate forecast on page load
+        window.addEventListener('load', function() {
+            generateForecast();
+            document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+        });
+    </script>
+</body>
+</html>
