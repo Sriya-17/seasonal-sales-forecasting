@@ -106,6 +106,20 @@ class TestValidationFunctions(unittest.TestCase):
             validate_numeric_range(150, min_val=0, max_val=100, field_name='percentage')
         
         self.assertEqual(context.exception.error_code, 'DATA_VALIDATION_ERROR')
+    
+    def test_validate_data_available_requires_upload(self):
+        """Even a non-empty dataframe should be considered unavailable until upload occurs."""
+        import pandas as pd
+        # simulate fresh server state where no upload has been performed
+        try:
+            import seasonal_sales_forecasting.app as appmod
+            appmod.upload_completed = False
+        except ImportError:
+            # if import fails under some test runners, skip the upload check
+            self.skipTest("Could not import app module to set upload flag")
+        with self.assertRaises(DataLoadError) as context:
+            validate_data_available(pd.DataFrame({'x':[1]}))
+        self.assertIn('upload', str(context.exception).lower())
 
 
 class TestErrorResponseFormatting(unittest.TestCase):

@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sales Forecast - Seasonal Sales Forecasting</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Chart.js library for interactive charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
         .forecast-header {
             background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
@@ -355,7 +357,7 @@
             <span id="status"></span>
         </div>
 
-        <!-- Historical vs Forecast -->
+        <!-- Historical vs Forecast (interactive) -->
         <div class="forecast-card">
             <div class="forecast-card-header">
                 <h3>📈 Historical vs Forecast</h3>
@@ -365,31 +367,25 @@
                 <div class="info-box">
                     <strong>📌 What this shows:</strong> Comparison between your actual historical sales (blue) and our AI-powered forecast (red) for the next period.
                 </div>
-                {% if historical_vs_forecast %}
-                    <img src="/static/plots/historical_vs_forecast.png?t={{ now }}" class="forecast-image" alt="Historical vs Forecast">
-                    <div class="stats-grid">
-                        <div class="stat-card" title="Average of all forecasted values">
-                            <div class="stat-card-label">📊 Mean Forecast <span style="cursor:help;" title="Average of all forecasted values">&#9432;</span></div>
-                            <div class="stat-card-value">${{ "{:,.0f}".format(forecast_mean) }}</div>
-                        </div>
-                        <div class="stat-card" title="Lowest forecasted value">
-                            <div class="stat-card-label">📉 Min Forecast <span style="cursor:help;" title="Lowest forecasted value">&#9432;</span></div>
-                            <div class="stat-card-value">${{ "{:,.0f}".format(forecast_min) }}</div>
-                        </div>
-                        <div class="stat-card" title="Highest forecasted value">
-                            <div class="stat-card-label">📈 Max Forecast <span style="cursor:help;" title="Highest forecasted value">&#9432;</span></div>
-                            <div class="stat-card-value">${{ "{:,.0f}".format(forecast_max) }}</div>
-                        </div>
-                        <div class="stat-card" title="Number of months forecasted">
-                            <div class="stat-card-label">📅 Forecast Periods <span style="cursor:help;" title="Number of months forecasted">&#9432;</span></div>
-                            <div class="stat-card-value">{{ forecast_periods }}</div>
-                        </div>
+                <canvas id="forecast-chart" style="max-width:100%; height:400px;"></canvas>
+                <div class="stats-grid">
+                    <div class="stat-card" title="Average of all forecasted values">
+                        <div class="stat-card-label">📊 Mean Forecast <span style="cursor:help;" title="Average of all forecasted values">&#9432;</span></div>
+                        <div class="stat-card-value">${{ "{:,.0f}".format(forecast_mean) }}</div>
                     </div>
-                {% else %}
-                    <div class="forecast-placeholder">
-                        <p>Click "Generate All Visualizations" to create forecast charts</p>
+                    <div class="stat-card" title="Lowest forecasted value">
+                        <div class="stat-card-label">📉 Min Forecast <span style="cursor:help;" title="Lowest forecasted value">&#9432;</span></div>
+                        <div class="stat-card-value">${{ "{:,.0f}".format(forecast_min) }}</div>
                     </div>
-                {% endif %}
+                    <div class="stat-card" title="Highest forecasted value">
+                        <div class="stat-card-label">📈 Max Forecast <span style="cursor:help;" title="Highest forecasted value">&#9432;</span></div>
+                        <div class="stat-card-value">${{ "{:,.0f}".format(forecast_max) }}</div>
+                    </div>
+                    <div class="stat-card" title="Number of months forecasted">
+                        <div class="stat-card-label">📅 Forecast Periods <span style="cursor:help;" title="Number of months forecasted">&#9432;</span></div>
+                        <div class="stat-card-value">{{ forecast_periods }}</div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -442,11 +438,11 @@
                         </div>
                         <div class="stat-card">
                             <div class="stat-card-label">📐 RMSE</div>
-                            <div class="stat-card-value">{{ rmse }}</div>
+                            <div class="stat-card-value">{{ rmse if rmse is not none else 'N/A' }}</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-card-label">📏 MAE</div>
-                            <div class="stat-card-value">{{ mae }}</div>
+                            <div class="stat-card-value">{{ mae if mae is not none else 'N/A' }}</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-card-label">⏰ Generated</div>
@@ -539,6 +535,67 @@
         }
         
         document.getElementById('generated-time').textContent = new Date().toLocaleString();
+        
+        // load interactive forecast chart using API
+        function loadForecastChart() {
+            fetch('/api/forecast-data')
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.success) {
+                        console.error('Forecast API returned error', data.error);
+                        return;
+                    }
+
+                    // combine points for time-series plotting using x/y objects
+                    const historicalPoints = data.historical.dates.map((date, idx) => ({
+                        x: date,
+                        y: data.historical.values[idx]
+                    }));
+                    const forecastPoints = data.forecast.dates.map((date, idx) => ({
+                        x: date,
+                        y: data.forecast.values[idx]
+                    }));
+
+                    const ctx = document.getElementById('forecast-chart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            datasets: [
+                                {
+                                    label: 'Historical',
+                                    data: historicalPoints,
+                                    borderColor: '#667eea',
+                                    backgroundColor: 'rgba(102,126,234,0.1)',
+                                    fill: false,
+                                    tension: 0.3
+                                },
+                                {
+                                    label: 'Forecast',
+                                    data: forecastPoints,
+                                    borderColor: '#dc2626',
+                                    backgroundColor: 'rgba(220,38,38,0.1)',
+                                    fill: false,
+                                    tension: 0.3
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { display: true } },
+                            scales: {
+                                x: {
+                                    type: 'time',
+                                    time: { parser: 'YYYY-MM-DD', unit: 'month' }
+                                },
+                                y: { beginAtZero: true }
+                            }
+                        }
+                    });
+                })
+                .catch(err => console.error('Forecast API error', err));
+        }
+        
+        document.addEventListener('DOMContentLoaded', loadForecastChart);
     </script>
 
     <footer>

@@ -396,12 +396,33 @@ def validate_numeric_range(value: float, min_val: float = None, max_val: float =
 
 
 def validate_data_available(df) -> bool:
-    """Validate that dataframe with data is available."""
+    """Validate that dataframe with data is available **and** that a user upload has taken place.
+
+    The application may load a fallback Walmart dataset at startup, but the user shouldn't be
+    able to run analysis/forecasting/recommendations unless they explicitly upload a file.
+    We look at the ``upload_completed`` flag in ``app`` to enforce this requirement.
+    """
+    try:
+        # import here to avoid circular dependency when the module is imported elsewhere
+        from seasonal_sales_forecasting import app
+    except ImportError:
+        # when running tests or outside the Flask context, the import may fail; ignore
+        app = None
+
     if df is None or (hasattr(df, 'empty') and df.empty):
         raise DataLoadError(
             "No dataset available. Please upload a CSV file.",
             details={'reason': 'dataframe_is_none_or_empty'}
         )
+
+    # if we have a valid frame but the user never uploaded during this session,
+    # treat as unavailable
+    if app is not None and not getattr(app, 'upload_completed', False):
+        raise DataLoadError(
+            "Dataset exists but no upload has been performed yet. Please upload your file first.",
+            details={'reason': 'upload_not_completed'}
+        )
+
     return True
 
 

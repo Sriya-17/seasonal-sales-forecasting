@@ -3,9 +3,9 @@ import pandas as pd
 import warnings
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.statespace.sarimax import SARIMAX
-from statsmodels.tsa.stattools import adfuller
-from sklearn.metrics import mean_squared_error, mean_absolute_error
-from itertools import product
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 warnings.filterwarnings("ignore")
 
@@ -62,7 +62,113 @@ def evaluate_model(ts, model_result):
         "rmse": rmse,
         "mae": mae
     }
+
+
+# =====================================================
+# RANDOM FOREST FORECAST
+# =====================================================
+
+def random_forest_forecast(ts, steps=12, n_estimators=100, max_depth=None):
+    """
+    Forecast using Random Forest regression with lagged features.
     
+    Args:
+        ts (pd.Series): Time series data
+        steps (int): Number of steps to forecast
+        n_estimators (int): Number of trees in the forest
+        max_depth (int): Maximum depth of the trees
+        
+    Returns:
+        dict: Forecast results with predictions and confidence intervals
+    """
+    # Create lagged features
+    df = pd.DataFrame({'y': ts})
+    lags = 12  # Use 12 lags (monthly seasonality)
+    
+    for i in range(1, lags + 1):
+        df[f'lag_{i}'] = df['y'].shift(i)
+    
+    # Add time-based features
+    df['month'] = df.index.month
+    df['quarter'] = df.index.quarter
+    
+    # Drop NaN rows
+    df = df.dropna()
+    
+    # Features and target
+    X = df.drop('y', axis=1)
+    y = df['y']
+    
+    # Train-test split (use last 20% for validation)
+    split_idx = int(len(df) * 0.8)
+    X_train, X_test = X[:split_idx], X[split_idx:]
+    y_train, y_test = y[:split_idx], y[split_idx:]
+    
+    # Scale features
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+    
+    # Train Random Forest
+    rf = RandomForestRegressor(
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        random_state=42,
+        n_jobs=-1
+    )
+    rf.fit(X_train_scaled, y_train)
+    
+    # Make predictions for forecast horizon
+    forecast_values = []
+    current_features = X.iloc[-1:].copy()  # Start with last known data
+    
+    for _ in range(steps):
+        # Scale current features
+        current_scaled = scaler.transform(current_features)
+        
+        # Predict next value
+        pred = rf.predict(current_scaled)[0]
+        forecast_values.append(pred)
+        
+        # Update features for next prediction
+        # Shift lags
+        for i in range(lags, 1, -1):
+            current_features[f'lag_{i}'] = current_features[f'lag_{i-1}']
+        current_features['lag_1'] = pred
+        
+        # Update month and quarter
+        next_date = current_features.index[-1] + pd.DateOffset(months=1)
+        current_features.index = [next_date]
+        current_features['month'] = next_date.month
+        current_features['quarter'] = next_date.quarter
+    
+    # Calculate confidence intervals using prediction intervals
+    # For simplicity, use a fixed interval based on test set performance
+    test_predictions = rf.predict(X_test_scaled)
+    residuals = y_test - test_predictions
+    std_residuals = np.std(residuals)
+    
+    forecast_series = pd.Series(forecast_values, 
+                               index=pd.date_range(ts.index[-1] + pd.DateOffset(months=1), 
+                                                 periods=steps, freq='MS'))
+    
+    # 95% confidence intervals
+    ci_lower = forecast_series - 1.96 * std_residuals
+    ci_upper = forecast_series + 1.96 * std_residuals
+    
+    conf_int = pd.DataFrame({
+        'lower': ci_lower,
+        'upper': ci_upper
+    })
+    
+    return {
+        "model": rf,
+        "forecast": forecast_series,
+        "conf_int": conf_int,
+        "scaler": scaler,
+        "feature_names": list(X.columns)
+    }
+
 
 def find_optimal_order(ts, max_p=5, max_d=2, max_q=5):
     """
@@ -187,6 +293,65 @@ def generate_forecast_summary(ts_train, model_result, n_periods=12, include_scen
         }
 
     return summary
+
+
+def forecast_with_scenario(ts_train, model_result, n_periods=12, scenario='baseline',
+                           growth_rate=0.0):
+    """
+    Generate simple scenario-based forecast.  This is a lightweight wrapper used
+    by tests and by some legacy modules.  It relies on the summary generator
+    above and applies an optional growth adjustment.
+
+    Args:
+        ts_train (pd.Series): Training series (monthly totals)
+        model_result (statsmodels result): Fitted ARIMA/SARIMA model
+        n_periods (int): Number of future periods to predict
+        scenario (str): 'baseline', 'pessimistic', or 'optimistic'
+        growth_rate (float): additional multiplicative growth to apply (e.g.
+            0.05 for +5%, -0.05 for -5%)
+
+    Returns:
+        dict: Contains 'success', 'scenario', 'n_periods', 'growth_rate',
+              'forecast_values', 'mean_forecast' and (optionally) ci bands.
+    """
+    try:
+        if scenario not in ['baseline', 'pessimistic', 'optimistic']:
+            return {'success': False, 'error': f'Invalid scenario: {scenario}'}
+
+        summary = generate_forecast_summary(ts_train, model_result, n_periods=n_periods, include_scenarios=True)
+        if 'baseline' not in summary:
+            return {'success': False, 'error': 'Unable to generate baseline forecast'}
+
+        if scenario == 'baseline':
+            df = summary['baseline']['forecast_df'].copy()
+        else:
+            # scenarios stored as simple dicts of values
+            vals = summary.get('scenarios', {}).get(scenario, {}).get('forecast_values')
+            if vals is None:
+                return {'success': False, 'error': f'Scenario {scenario} not available'}
+            dates = summary['baseline']['forecast_df']['date']
+            df = pd.DataFrame({'date': dates, 'forecast': vals})
+
+        # apply growth rate if provided
+        if growth_rate != 0:
+            df['forecast'] = df['forecast'] * (1 + growth_rate)
+
+        result = {
+            'success': True,
+            'scenario': scenario,
+            'n_periods': n_periods,
+            'growth_rate': growth_rate,
+            'forecast_values': df['forecast'].tolist(),
+            'mean_forecast': float(df['forecast'].mean())
+        }
+        # include ci bands if present
+        if 'lower_ci' in df.columns and 'upper_ci' in df.columns:
+            result['lower_ci'] = df['lower_ci'].tolist()
+            result['upper_ci'] = df['upper_ci'].tolist()
+
+        return result
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
 
 
 

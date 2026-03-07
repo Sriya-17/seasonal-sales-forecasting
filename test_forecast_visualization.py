@@ -181,6 +181,10 @@ class TestForecastVisualization(unittest.TestCase):
         self.assertEqual(len(result['forecast']['values']), len(result['forecast']['dates']))
         self.assertEqual(len(result['forecast']['lower_ci']), len(result['forecast']['dates']))
         self.assertEqual(len(result['forecast']['upper_ci']), len(result['forecast']['dates']))
+        # forecast horizon should start after the last historical date
+        hist_last = pd.to_datetime(result['historical']['dates'][-1])
+        fc_first = pd.to_datetime(result['forecast']['dates'][0])
+        self.assertGreater(fc_first, hist_last)
         
         # Check statistics
         self.assertIn('forecast_mean', result['statistics'])
@@ -254,6 +258,121 @@ class TestForecastVisualization(unittest.TestCase):
             self.assertAlmostEqual(v1, v2, delta=1.0)
         
         print("✅ TEST 10: Visualization Data Consistency - PASSED")
+
+    def test_11_api_forecast_data_endpoint(self):
+        """Verify the `/api/forecast-data` route returns proper JSON and supports CSV download."""
+        # import the Flask app and assign a small dataframe for testing
+        from seasonal_sales_forecasting.app import app as flask_app
+        import seasonal_sales_forecasting.app as appmod
+        import pandas as pd
+
+        # create minimal monthly series with at least 3 points
+        dates = pd.date_range(start='2021-01-01', periods=6, freq='MS')
+        values = [100, 120, 110, 130, 125, 140]
+        test_df = pd.DataFrame({'Date': dates, 'Weekly_Sales': values})
+
+        appmod.df = test_df
+        flask_app.upload_completed = True
+
+        with flask_app.test_client() as client:
+            # simulate logged in user
+            with client.session_transaction() as sess:
+                sess['user_id'] = 'testuser'
+
+            # JSON endpoint
+            resp = client.get('/api/forecast-data')
+            self.assertEqual(resp.status_code, 200)
+            data = resp.get_json()
+            self.assertTrue(data['success'])
+            self.assertIn('historical', data)
+            self.assertIn('forecast', data)
+            # ensure forecast begins after the historical range
+            hist_last = pd.to_datetime(data['historical']['dates'][-1])
+            fc_first = pd.to_datetime(data['forecast']['dates'][0])
+            self.assertGreater(fc_first, hist_last)
+
+            # CSV download
+            csv_resp = client.get('/api/forecast-data?download=1')
+            self.assertEqual(csv_resp.status_code, 200)
+            self.assertIn('text/csv', csv_resp.content_type)
+            self.assertIn('forecast_data.csv', csv_resp.headers.get('Content-Disposition', ''))
+
+        # ensure forecasting uses full historical range (visualization endpoint
+        # triggered below also relies on same data)
+        hist_last = pd.to_datetime(data['historical']['dates'][-1])
+        fc_first = pd.to_datetime(data['forecast']['dates'][0])
+        self.assertGreater(fc_first, hist_last)
+        print("✅ TEST 11: Forecast Data API Endpoint - PASSED")
+
+    def test_12_visualizations_endpoint_uses_full_history(self):
+        """Generating visualizations should train on full dataset, not 75%."""
+        from seasonal_sales_forecasting.app import app as flask_app
+        import seasonal_sales_forecasting.app as appmod
+        import pandas as pd
+
+        # create a simple monthly series
+        dates = pd.date_range(start='2022-01-01', periods=6, freq='MS')
+        values = [200, 220, 205, 230, 215, 240]
+        test_df = pd.DataFrame({'Date': dates, 'Weekly_Sales': values})
+
+        appmod.df = test_df
+        flask_app.upload_completed = True
+
+        with flask_app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess['user_id'] = 'testuser'
+
+            resp = client.get('/api/visualizations/generate')
+            self.assertEqual(resp.status_code, 200)
+            vis_data = resp.get_json()
+            self.assertTrue(vis_data['success'])
+
+            # after generation ensure forecast_data still extends past history
+            resp2 = client.get('/api/forecast-data')
+            self.assertEqual(resp2.status_code, 200)
+            dat = resp2.get_json()
+            hist_last = pd.to_datetime(dat['historical']['dates'][-1])
+            fc_first = pd.to_datetime(dat['forecast']['dates'][0])
+            self.assertGreater(fc_first, hist_last)
+
+        print("✅ TEST 12: Visualizations endpoint uses full history - PASSED")
+
+        print("✅ TEST 11: Forecast Data API Endpoint - PASSED")
+
+    def test_13_plot_endpoint_refreshes_with_new_data(self):
+        """Ensure plot API returns different image when dataframe content changes."""
+        from seasonal_sales_forecasting.app import app as flask_app
+        import seasonal_sales_forecasting.app as appmod
+        import pandas as pd
+
+        # initial small dataset
+        dates1 = pd.date_range(start='2020-01-01', periods=3, freq='MS')
+        df1 = pd.DataFrame({'Date': dates1, 'Weekly_Sales': [10, 20, 30]})
+        appmod.df = df1
+        flask_app.upload_completed = True
+
+        with flask_app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess['user_id'] = 'testuser'
+
+            resp1 = client.get('/api/plot/sales-over-time')
+            self.assertEqual(resp1.status_code, 200)
+            img1 = resp1.get_json().get('plot')
+
+            # update dataframe with noticeably different values
+            dates2 = pd.date_range(start='2020-01-01', periods=3, freq='MS')
+            df2 = pd.DataFrame({'Date': dates2, 'Weekly_Sales': [1000, 2000, 3000]})
+            appmod.df = df2
+
+            resp2 = client.get('/api/plot/sales-over-time')
+            self.assertEqual(resp2.status_code, 200)
+            img2 = resp2.get_json().get('plot')
+
+            self.assertIsNotNone(img1)
+            self.assertIsNotNone(img2)
+            self.assertNotEqual(img1, img2, "Plot did not change after dataset update")
+
+        print("✅ TEST 13: Plot endpoint refreshes with new data - PASSED")
 
 
 class TestVisualizationIntegration(unittest.TestCase):

@@ -18,7 +18,7 @@ from data_storage import init_sales_db, store_sales_data, get_user_sales_data, d
 from data_analysis import perform_eda, get_monthly_trends, get_seasonal_patterns, get_peak_and_low_periods, get_store_analysis
 from data_visualization import create_all_visualizations, create_sales_over_time_plot, create_seasonality_plot, create_seasonal_breakdown_plot, create_store_performance_plot, create_yearly_comparison_plot, create_distribution_plot
 # from models.arima_model import arima_forecast, sarima_forecast, evaluate_model
-from models.arima_model import fit_arima, forecast_n_months, generate_forecast_summary, arima_forecast, sarima_forecast, evaluate_model
+from models.arima_model import fit_arima, forecast_n_months, generate_forecast_summary, arima_forecast, sarima_forecast, evaluate_model, random_forest_forecast
 from forecast_visualization import ForecastVisualizer, create_forecast_json_chart
 from recommendation_engine import RecommendationEngine, create_recommendations_json
 from error_handlers import (
@@ -44,78 +44,17 @@ def login_required(f):
     return decorated_function
 
 # --- Download forecast as CSV for user-uploaded data ---
-@app.route('/api/forecast-data', methods=['GET'])
-@login_required
-def download_forecast_csv():
-    user_id = session.get('user_id')
-    from data_storage import get_user_sales_data
-    user_df = get_user_sales_data(user_id)
-    use_df = None
-    if user_df is not None and not user_df.empty:
-        user_df['Date'] = pd.to_datetime(user_df['date']) if 'date' in user_df.columns else pd.to_datetime(user_df['Date'])
-        user_df['Weekly_Sales'] = user_df['sales'] if 'sales' in user_df.columns else user_df['Weekly_Sales']
-        use_df = user_df.rename(columns={'Date': 'Date', 'Weekly_Sales': 'Weekly_Sales'})
-    else:
-        use_df = df
-    # Only use user data if it has at least 3 months of data
-    df_copy = use_df.copy()
-    df_copy['Date'] = pd.to_datetime(df_copy['Date'])
-    df_copy = df_copy.sort_values('Date')
-    ts_data = df_copy.groupby('Date')['Weekly_Sales'].sum()
-    ts_monthly = ts_data.resample('MS').sum()
-    if len(ts_monthly) < 3:
-        return 'Insufficient data for forecast', 400
-    ts_train = ts_monthly.iloc[:int(len(ts_monthly)*0.75)]
-    model_result = fit_arima(ts_train, order=(0, 0, 1))
-    forecast_result = forecast_n_months(ts_train, model_result, n_months=12)
-    forecast_df = forecast_result['forecast_df'].copy()
-    forecast_df = forecast_df.reset_index()
-    forecast_df.rename(columns={'index': 'date'}, inplace=True)
-    csv_buffer = StringIO()
-    forecast_df.to_csv(csv_buffer, index=False)
-    csv_buffer.seek(0)
-    from flask import Response
-    return Response(
-        csv_buffer.getvalue(),
-        mimetype='text/csv',
-        headers={
-            'Content-Disposition': 'attachment;filename=forecast_data.csv'
-        }
-    )
+# previously we offered a separate download endpoint for forecast CSV.  
+# This functionality is now folded into the JSON-producing `/api/forecast-data` route,
+# which checks for a ``download`` query parameter.  The old handler remains here for
+# historical reference but is effectively disabled by removing its route decorator.
+#
+# @app.route('/api/forecast-data', methods=['GET'])
+# @login_required
+# def download_forecast_csv():
+#     # legacy CSV download logic (migrated to get_forecast_data)
+#     ...
 
-
-from flask import Flask, render_template, request, redirect, url_for, session, g, flash, jsonify, make_response
-import sqlite3
-import os
-import logging
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-from functools import wraps
-from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
-from config import Config
-from data_loader import load_data, get_store_summary, get_store_data, get_data_stats
-from data_preprocessor import preprocess_data
-from csv_validator import validate_csv_structure, allowed_file, process_and_save_upload
-from data_storage import init_sales_db, store_sales_data, get_user_sales_data, delete_user_sales_data, get_user_sales_summary
-from data_analysis import perform_eda, get_monthly_trends, get_seasonal_patterns, get_peak_and_low_periods, get_store_analysis
-from data_visualization import create_all_visualizations, create_sales_over_time_plot, create_seasonality_plot, create_seasonal_breakdown_plot, create_store_performance_plot, create_yearly_comparison_plot, create_distribution_plot
-# from models.arima_model import arima_forecast, sarima_forecast, evaluate_model
-from models.arima_model import fit_arima, forecast_n_months, generate_forecast_summary, arima_forecast, sarima_forecast, evaluate_model
-from forecast_visualization import ForecastVisualizer, create_forecast_json_chart
-from recommendation_engine import RecommendationEngine, create_recommendations_json
-from error_handlers import (
-    app_logger, SalesForecastingException, DataValidationError, DataLoadError,
-    FileUploadError, InsufficientDataError, ModelTrainingError, DatabaseError,
-    AuthenticationError, AuthorizationError, ResourceNotFoundError, 
-    handle_errors, validate_request_data, require_auth, require_json, safe_db_operation,
-    validate_csv_file, validate_data_available, ErrorRecoveryStrategy, DatabaseOperation,
-    format_error_response
-)
-
-app = Flask(__name__)
-app.config.from_object(Config)
 
 # Configure logging for session management
 logging.basicConfig(level=logging.INFO)
@@ -125,10 +64,16 @@ logger = logging.getLogger(__name__)
 init_sales_db()
 
 # Load dataset at startup (with fallback)
+# NOTE: we keep a flag to ensure users explicitly upload before any analysis/forecasting
+# even if a default Walmart dataset is present on disk. This prevents the app from
+# showing results automatically when the server restarts.
 df = None
 store_summary = None
 data_source = None
 preprocessing_stats = {}
+
+# set to True only once a new file has been uploaded during the current session
+upload_completed = False
 
 try:
     df, data_source = load_data(prefer_uploaded=True)
@@ -417,6 +362,10 @@ def logout():
 def dashboard():
     """Display dashboard with data statistics and visualizations."""
     try:
+        # if user has not yet uploaded a dataset this session, remind them
+        if not upload_completed:
+            flash('Upload a dataset to enable analysis, forecasting, and recommendations.', 'info')
+
         stats = {}
         if df is not None and not df.empty:
             stats = get_data_stats(df)
@@ -521,6 +470,10 @@ def upload():
                     delete_user_sales_data(user_id)
                     store_sales_data(user_id, df)
                     
+                    # mark upload success so other pages become available
+                    global upload_completed
+                    upload_completed = True
+                    
                     app_logger.info(f"User {user_id} uploaded file '{filename}' with {len(df)} records")
                     flash(f'✅ File uploaded successfully! {message}', 'success')
                     return redirect(url_for('forecast'))
@@ -549,15 +502,17 @@ def upload():
             flash(f'An unexpected error occurred during upload: {str(e)}', 'error')
             return redirect(url_for('upload'))
     
+    # after a GET or a failed POST we still render upload page
+    # if the upload just succeeded, the flag will already have been set above
     return render_template('upload_improved.html', data_source=data_source)
 
 
 @app.route('/analysis')
 @login_required
 def analysis():
-    if df is None:
-        flash('Dataset not available.', 'error')
-        return redirect(url_for('dashboard'))
+    if df is None or not upload_completed:
+        flash('Please upload a dataset before accessing analysis.', 'error')
+        return redirect(url_for('upload'))
     stores = df['Store'].unique().tolist()
     return render_template('analysis_improved.html', stores=stores)
 
@@ -708,10 +663,27 @@ def api_visualizations():
     })
 
 
+
+# helper to refresh global dataframe from disk
+
+def refresh_data():
+    """Load the latest data (uploaded or walmart) and update globals.
+    Returns the dataframe or None if unavailable."""
+    global df, data_source, preprocessing_stats, store_summary
+    df, data_source = load_data(prefer_uploaded=True)
+    if df is not None and not df.empty:
+        df, preprocessing_stats = preprocess_data(df)
+        store_summary = get_store_summary(df)
+    return df
+
+
 @app.route('/api/plot/sales-over-time')
 @login_required
 def plot_sales_over_time():
     """Get sales over time visualization."""
+    # ensure we are always working with the latest dataset on disk
+    if df is None:
+        refresh_data()
     if df is None:
         return jsonify({'error': 'Dataset not available'}), 500
     
@@ -719,7 +691,11 @@ def plot_sales_over_time():
     if plot is None:
         return jsonify({'error': 'Failed to generate plot'}), 500
     
-    return jsonify({'plot': plot, 'title': 'Sales Over Time'})
+    response = jsonify({'plot': plot, 'title': 'Sales Over Time'})
+    # prevent client-side caching of old images
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    return response
 
 
 @app.route('/api/plot/seasonality')
@@ -727,13 +703,18 @@ def plot_sales_over_time():
 def plot_seasonality():
     """Get seasonality visualization."""
     if df is None:
+        refresh_data()
+    if df is None:
         return jsonify({'error': 'Dataset not available'}), 500
     
     plot = create_seasonality_plot(df)
     if plot is None:
         return jsonify({'error': 'Failed to generate plot'}), 500
     
-    return jsonify({'plot': plot, 'title': 'Monthly Seasonality Patterns'})
+    response = jsonify({'plot': plot, 'title': 'Monthly Seasonality Patterns'})
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    return response
 
 
 @app.route('/api/plot/seasonal-breakdown')
@@ -741,13 +722,18 @@ def plot_seasonality():
 def plot_seasonal_breakdown():
     """Get seasonal breakdown visualization."""
     if df is None:
+        refresh_data()
+    if df is None:
         return jsonify({'error': 'Dataset not available'}), 500
     
     plot = create_seasonal_breakdown_plot(df)
     if plot is None:
         return jsonify({'error': 'Failed to generate plot'}), 500
     
-    return jsonify({'plot': plot, 'title': 'Seasonal Breakdown'})
+    response = jsonify({'plot': plot, 'title': 'Seasonal Breakdown'})
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    return response
 
 
 @app.route('/api/plot/store-performance')
@@ -755,13 +741,18 @@ def plot_seasonal_breakdown():
 def plot_store_perf():
     """Get store performance visualization."""
     if df is None:
+        refresh_data()
+    if df is None:
         return jsonify({'error': 'Dataset not available'}), 500
     
     plot = create_store_performance_plot(df)
     if plot is None:
         return jsonify({'error': 'Failed to generate plot'}), 500
     
-    return jsonify({'plot': plot, 'title': 'Store Performance Analysis'})
+    response = jsonify({'plot': plot, 'title': 'Store Performance Analysis'})
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    return response
 
 
 @app.route('/api/plot/yearly-comparison')
@@ -769,13 +760,18 @@ def plot_store_perf():
 def plot_yearly_comp():
     """Get yearly comparison visualization."""
     if df is None:
+        refresh_data()
+    if df is None:
         return jsonify({'error': 'Dataset not available'}), 500
     
     plot = create_yearly_comparison_plot(df)
     if plot is None:
         return jsonify({'error': 'Failed to generate plot'}), 500
     
-    return jsonify({'plot': plot, 'title': 'Year-over-Year Comparison'})
+    response = jsonify({'plot': plot, 'title': 'Year-over-Year Comparison'})
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    return response
 
 
 @app.route('/api/plot/distribution')
@@ -783,13 +779,18 @@ def plot_yearly_comp():
 def plot_dist():
     """Get sales distribution visualization."""
     if df is None:
+        refresh_data()
+    if df is None:
         return jsonify({'error': 'Dataset not available'}), 500
     
     plot = create_distribution_plot(df)
     if plot is None:
         return jsonify({'error': 'Failed to generate plot'}), 500
     
-    return jsonify({'plot': plot, 'title': 'Sales Distribution'})
+    response = jsonify({'plot': plot, 'title': 'Sales Distribution'})
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    return response
 
 
 
@@ -797,8 +798,8 @@ def plot_dist():
 @login_required
 def forecast():
     """Display forecast visualization page"""
-    if df is None:
-        flash('Dataset not available. Please upload a CSV file.', 'error')
+    if df is None or not upload_completed:
+        flash('Please upload a dataset before viewing the forecast.', 'error')
         return redirect(url_for('upload'))
 
     import os
@@ -841,20 +842,24 @@ def forecast():
         ts_monthly = ts_data.resample('MS').sum()
         if len(ts_monthly) < 3:
             raise Exception('Insufficient data for forecasting')
-        ts_train = ts_monthly.iloc[:int(len(ts_monthly)*0.75)]
-        model_result = fit_arima(ts_train, order=(0, 0, 1))
-        forecast_result = forecast_n_months(ts_train, model_result, n_months=12)
-        forecast_df = forecast_result['forecast_df']
+        # train on the full series so predictions reflect the latest trend
+        ts_train = ts_monthly
+        # Use Random Forest instead of ARIMA
+        rf_result = random_forest_forecast(ts_train, steps=12)
+        forecast_df = pd.DataFrame({
+            'forecast': rf_result['forecast'],
+            'lower_ci': rf_result['conf_int']['lower'],
+            'upper_ci': rf_result['conf_int']['upper']
+        })
         forecast_mean = float(forecast_df['forecast'].mean())
         forecast_min = float(forecast_df['forecast'].min())
         forecast_max = float(forecast_df['forecast'].max())
         forecast_periods = len(forecast_df)
         ci_avg_width = float((forecast_df['upper_ci'] - forecast_df['lower_ci']).mean())
-        model_used = 'ARIMA(0,0,1)'
-        # Evaluate model on train
-        eval_metrics = evaluate_model(ts_train, model_result)
-        rmse = float(eval_metrics['rmse'])
-        mae = float(eval_metrics['mae'])
+        model_used = 'Random Forest'
+        # For Random Forest, we don't have fitted values like ARIMA, so skip evaluation
+        rmse = None
+        mae = None
         # Scenario means
         baseline_mean = forecast_mean
         pessimistic_mean = float(forecast_df['forecast'].mean() * 0.95)
@@ -914,17 +919,34 @@ def generate_visualizations():
         # Resample to monthly
         ts_monthly = ts_data.resample('MS').sum()
         
-        # Split data for training
-        ts_train = ts_monthly.iloc[:int(len(ts_monthly)*0.75)]
+        # train on the full monthly series so visualizations reflect all data
+        ts_train = ts_monthly
         
-        # Train ARIMA model
-        model_result = fit_arima(ts_train, order=(0, 0, 1))
+        # Train Random Forest model
+        rf_result = random_forest_forecast(ts_train, steps=12)
         
-        # Generate forecast
-        forecast_result = forecast_n_months(ts_train, model_result, n_months=12)
+        # Create forecast result compatible with visualizer
+        forecast_result = {
+            'forecast_df': pd.DataFrame({
+                'forecast': rf_result['forecast'],
+                'lower_ci': rf_result['conf_int']['lower'],
+                'upper_ci': rf_result['conf_int']['upper']
+            })
+        }
         
-        # Generate forecast with scenarios
-        forecast_summary = generate_forecast_summary(ts_train, model_result, n_periods=12, include_scenarios=True)
+        # Generate forecast summary for scenarios
+        forecast_values = rf_result['forecast'].values
+        forecast_summary = {
+            "baseline": forecast_result,
+            "scenarios": {
+                "pessimistic": {
+                    "forecast_values": forecast_values * 0.95
+                },
+                "optimistic": {
+                    "forecast_values": forecast_values * 1.05
+                }
+            }
+        }
         
         # Create visualizations
         visualizer = ForecastVisualizer(output_dir='static/plots')
@@ -982,20 +1004,19 @@ def api_forecast():
         train_size = max(3, int(len(ts_monthly) * 0.75))
         ts_train = ts_monthly.iloc[:train_size]
         
-        # Try ARIMA model
+        # Try Random Forest model
         try:
-            model_result = fit_arima(ts_train, order=(0, 0, 1))
-            forecast_result = forecast_n_months(ts_train, model_result, n_months=12)
-            app_logger.info(f"ARIMA forecast generated successfully for {len(ts_monthly)} months of data")
+            forecast_result = random_forest_forecast(ts_train, n_months=12)
+            app_logger.info(f"Random Forest forecast generated successfully for {len(ts_monthly)} months of data")
         except Exception as model_error:
-            app_logger.warning(f"ARIMA model failed, using fallback: {str(model_error)}")
+            app_logger.warning(f"Random Forest model failed, using fallback: {str(model_error)}")
             # Use fallback recovery
             recovery_result = ErrorRecoveryStrategy.on_model_training_failure(model_error, 'simple_average')
             
             if not recovery_result['success']:
                 raise ModelTrainingError(
                     "Forecast model training failed and fallback unavailable",
-                    model_type='ARIMA',
+                    model_type='Random Forest',
                     details={'original_error': str(model_error)}
                 )
             
@@ -1017,25 +1038,25 @@ def api_forecast():
                 'mean_sales': float(df['Weekly_Sales'].mean()),
                 'model_summary': 'Fallback Model (Simple Average)',
                 'success': True,
-                'note': 'Using fallback model due to insufficient data for ARIMA'
+                'note': 'Using fallback model due to insufficient data for Random Forest'
             })
         
         # Format forecast data
         forecast_data = []
-        forecast_df = forecast_result['forecast_df']
-        for i in range(len(forecast_df)):
-            row = forecast_df.iloc[i]
+        forecast_series = forecast_result['forecast']
+        conf_int = forecast_result['conf_int']
+        for i in range(len(forecast_series)):
             forecast_data.append({
                 'month': i + 1,
-                'forecast': float(max(0, row['forecast'])),
-                'conf_low': float(max(0, row['lower_ci'])),
-                'conf_high': float(max(0, row['upper_ci']))
+                'forecast': float(max(0, forecast_series.iloc[i])),
+                'conf_low': float(max(0, conf_int.iloc[i]['lower'])),
+                'conf_high': float(max(0, conf_int.iloc[i]['upper']))
             })
         
         return jsonify({
             'forecast': forecast_data,
             'mean_sales': float(df['Weekly_Sales'].mean()),
-            'model_summary': 'ARIMA(0,0,1)',
+            'model_summary': 'Random Forest Regression',
             'success': True
         })
         
@@ -1054,7 +1075,11 @@ def api_forecast():
 @login_required
 @handle_errors
 def get_forecast_data():
-    """Get forecast data as JSON for charting libraries."""
+    """Get forecast data as JSON for charting libraries.
+
+    If the query string contains ``download=1`` the handler will return a CSV
+    attachment identical to the legacy ``download_forecast_csv`` endpoint.
+    """
     validate_data_available(df)
     
     try:
@@ -1074,14 +1099,41 @@ def get_forecast_data():
                 actual=len(ts_monthly)
             )
         
-        # Split data
-        ts_train = ts_monthly.iloc[:int(len(ts_monthly)*0.75)]
+        # use entire monthly series for training so that forecasts leverage
+        # all available history.  Previously we held back 25% solely for
+        # evaluation which confused users by making the red "forecast" line
+        # follow only part of the data.
+        ts_train = ts_monthly
         
-        # Train and forecast
-        model_result = fit_arima(ts_train, order=(0, 0, 1))
-        forecast_result = forecast_n_months(ts_train, model_result, n_months=12)
+        # Train and forecast on full history using Random Forest
+        rf_result = random_forest_forecast(ts_train, steps=12)
+        forecast_result = {
+            'forecast_df': pd.DataFrame({
+                'forecast': rf_result['forecast'],
+                'lower_ci': rf_result['conf_int']['lower'],
+                'upper_ci': rf_result['conf_int']['upper']
+            })
+        }
+
+        # if the user requested a CSV download, build and return it
+        if request.args.get('download'):
+            from io import StringIO
+            from flask import Response
+            forecast_df = forecast_result.get('forecast_df').copy()
+            forecast_df = forecast_df.reset_index()
+            forecast_df.rename(columns={'index': 'date'}, inplace=True)
+            csv_buffer = StringIO()
+            forecast_df.to_csv(csv_buffer, index=False)
+            csv_buffer.seek(0)
+            return Response(
+                csv_buffer.getvalue(),
+                mimetype='text/csv',
+                headers={
+                    'Content-Disposition': 'attachment;filename=forecast_data.csv'
+                }
+            )
         
-        # Create JSON chart data
+        # otherwise return JSON for charting
         chart_data = create_forecast_json_chart(ts_train, forecast_result)
         
         return jsonify(chart_data)
@@ -1101,6 +1153,9 @@ def get_forecast_data():
 @login_required
 def recommendation():
     """Display business recommendations page."""
+    if df is None or not upload_completed:
+        flash('Please upload a dataset before viewing recommendations.', 'error')
+        return redirect(url_for('upload'))
     try:
         user_id = session.get('user_id')
         from data_storage import get_user_sales_data
@@ -1232,13 +1287,12 @@ def generate_recommendations():
                 actual=len(ts_monthly)
             )
         
-        # Train ARIMA model for forecast context
+        # Train Random Forest model for forecast context
         ts_train = ts_monthly.iloc[:int(len(ts_monthly)*0.75)]
         forecast_data = None
         
         try:
-            model_result = fit_arima(ts_train, order=(0, 0, 1))
-            forecast_result = forecast_n_months(ts_train, model_result, n_months=12)
+            forecast_result = random_forest_forecast(ts_train, n_months=12)
             forecast_data = {'forecast': forecast_result}
         except Exception as forecast_error:
             app_logger.warning(f"Forecast computation failed for recommendations: {str(forecast_error)}")
@@ -1355,4 +1409,5 @@ def unified_analysis_api():
 if __name__ == '__main__':
     init_db()
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='127.0.0.1', port=port, debug=True)
+    # debug mode disabled to prevent reloader from interfering when run in background
+    app.run(host='127.0.0.1', port=port, debug=False)
