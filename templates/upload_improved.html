@@ -312,9 +312,11 @@
         <ul class="nav-links">
             <li><a href="/dashboard">Dashboard</a></li>
             <li><a href="/upload" class="active">Upload</a></li>
+            {% if data_uploaded %}
             <li><a href="/analysis">Analysis</a></li>
-            <li><a href="/forecast">Forecast</a></li>
+            <li><a href="/predictions">View Predictions</a></li>
             <li><a href="/recommendation">Recommendations</a></li>
+            {% endif %}
             <li><a href="/logout">Logout</a></li>
         </ul>
     </header>

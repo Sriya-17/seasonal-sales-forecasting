@@ -1,0 +1,69 @@
+# PySpark Integration Requirements
+# ========================================
+# Add these packages to your requirements.txt file
+
+# Core Big Data Framework
+pyspark==3.4.1                  # Apache Spark for Python
+
+# Data Processing (already installed, maintaining versions)
+pandas==1.5.3
+numpy==1.24.3
+
+# Machine Learning
+scikit-learn==1.3.0             # Classical ML algorithms
+
+# Model Persistence
+joblib==1.3.1
+
+# Flask and Utilities
+Flask==3.0.0                    # Already installed
+python-dotenv==1.0.0            # For environment variables
+
+# Development Tools
+pytest==7.4.0                   # Testing framework (optional)
+pytest-spark==0.6.0             # PySpark testing utilities (optional)
+
+# ========================================
+# IMPORTANT NOTES:
+# ========================================
+
+# 1. PySpark requires Java 8+
+#    - Check: java -version
+#    - Install if needed: brew install openjdk@11
+
+# 2. Python version: 3.8+ required
+#    - Check: python --version
+
+# 3. Installation order matters
+#    - Install Java first
+#    - Then pip install pyspark
+
+# 4. Memory considerations
+#    - PySpark allocates memory on startup
+#    - Default: 2GB driver + 4GB executor
+#    - Configure in spark_config.py as needed
+
+# 5. Optional: For cluster deployment
+#    - Spark cluster setup required
+#    - Update master URL in SparkConfig
+#    - May need: pyspark-yarn, spark-tensorflow, etc.
+
+# ========================================
+# INSTALLATION COMMAND:
+# ========================================
+# pip install -r requirements_pyspark.txt
+
+# ========================================
+# QUICK START AFTER INSTALLATION:
+# ========================================
+# 1. Verify Java:
+#    java -version
+#
+# 2. Verify PySpark:
+#    python -c "from pyspark.sql import SparkSession; print('✅ OK')"
+#
+# 3. Run tests:
+#    python test_pyspark_integration.py
+#
+# 4. Run examples:
+#    python flask_pyspark_integration.py

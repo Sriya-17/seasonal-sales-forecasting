@@ -1,0 +1,39 @@
+{
+  "timestamp": "2026-03-09T00:09:37.387285",
+  "data_isolation": {
+    "checks_passed": 2,
+    "checks_failed": 1,
+    "issues": [
+      "\u274c No user-specific sales tables found"
+    ]
+  },
+  "forecast_accuracy": {
+    "checks_passed": 4,
+    "checks_failed": 0,
+    "issues": [],
+    "metrics": {
+      "arima_config": "Valid",
+      "forecast_bounds": "Valid",
+      "confidence_intervals": "Valid",
+      "seasonality": "Valid"
+    }
+  },
+  "graph_display": {
+    "checks_passed": 5,
+    "checks_failed": 0,
+    "issues": [],
+    "graphs_validated": [
+      "chart_json_format",
+      "data_series_integrity",
+      "forecast_visualization",
+      "analysis_visualizations",
+      "responsive_design"
+    ]
+  },
+  "summary": {
+    "total_checks": 12,
+    "passed": 11,
+    "failed": 1,
+    "pass_rate": 91.67
+  }
+}

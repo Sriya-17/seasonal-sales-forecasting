@@ -497,6 +497,31 @@
                 grid-template-columns: 1fr 1fr;
             }
         }
+
+        /* ML Predictions Styles */
+        .metric-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .metric-item:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            font-weight: 600;
+            color: #555;
+            font-size: 0.9rem;
+        }
+
+        .metric-value {
+            font-weight: 700;
+            color: #2c3e50;
+            font-size: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -505,9 +530,11 @@
         <ul class="nav-links">
             <li><a href="/dashboard">Dashboard</a></li>
             <li><a href="/upload">Upload</a></li>
+            {% if data_uploaded %}
             <li><a href="/analysis">Analysis</a></li>
-            <li><a href="/forecast">Forecast</a></li>
+            <li><a href="/predictions">View Predictions</a></li>
             <li><a href="/recommendation" class="active">Recommendations</a></li>
+            {% endif %}
             <li><a href="/logout">Logout</a></li>
         </ul>
     </header>
@@ -518,6 +545,81 @@
             <h1>💡 Smart Recommendations</h1>
             <p>AI-powered insights to boost your sales and optimize operations</p>
         </div>
+
+        <!-- ML Predictions Section -->
+        {% if model_trained and ml_predictions %}
+        <div class="card" style="border: 2px solid #667eea; border-radius: 15px; margin-bottom: 2rem;">
+            <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 13px 13px 0 0;">
+                <h2 class="mb-0" style="font-size: 1.5rem;">
+                    <i class="fas fa-brain"></i> ML Sales Predictions
+                </h2>
+            </div>
+            <div class="card-body" style="padding: 2rem;">
+                <p class="lead" style="font-size: 1rem; color: #555; margin-bottom: 1.5rem;">
+                    Your Random Forest model has analyzed your sales data and generated predictions for the next 12 months.
+                    These predictions form the basis of our tailored recommendations below.
+                </p>
+
+                <!-- Training Results -->
+                {% if training_results %}
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card" style="border: 1px solid #e0e0e0; border-radius: 10px;">
+                            <div class="card-header" style="background: #f8f9fa; border-radius: 8px 8px 0 0;">
+                                <h5 style="margin: 0;"><i class="fas fa-chart-line"></i> Model Performance</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="metric-item">
+                                    <span class="metric-label">Training Accuracy:</span>
+                                    <span class="metric-value">{{ "%.1f"|format(training_results.get('accuracy', 0) * 100) }}%</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Features Used:</span>
+                                    <span class="metric-value">{{ training_results.get('n_features', 0) }}</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Training Samples:</span>
+                                    <span class="metric-value">{{ training_results.get('n_samples', 0) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card" style="border: 1px solid #e0e0e0; border-radius: 10px;">
+                            <div class="card-header" style="background: #f8f9fa; border-radius: 8px 8px 0 0;">
+                                <h5 style="margin: 0;"><i class="fas fa-calendar-alt"></i> Prediction Overview</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="metric-item">
+                                    <span class="metric-label">Next 12 Months:</span>
+                                    <span class="metric-value">{{ ml_predictions|length }} predictions</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Avg Monthly Sales:</span>
+                                    <span class="metric-value">${{ "%.0f"|format(ml_predictions|map(attribute='predicted_sales')|list|average) }}</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Peak Month:</span>
+                                    <span class="metric-value">{{ ml_predictions|sort(attribute='predicted_sales')|last.month }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Predictions Chart -->
+                <div class="card" style="border: 1px solid #e0e0e0; border-radius: 10px;">
+                    <div class="card-header" style="background: #f8f9fa; border-radius: 8px 8px 0 0;">
+                        <h5 style="margin: 0;"><i class="fas fa-chart-bar"></i> 12-Month Sales Forecast</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="predictionsChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Executive Summary Section -->
         {% if recommendations.summary %}
@@ -867,7 +969,88 @@
         <p style="margin-top: 0.5rem; font-size: 0.9rem;">All recommendations are based on comprehensive data analysis and industry best practices</p>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+        // Render ML Predictions Chart
+        {% if model_trained and ml_predictions %}
+        document.addEventListener('DOMContentLoaded', function() {
+            const predictionsData = {{ ml_predictions|tojson }};
+            
+            const ctx = document.getElementById('predictionsChart').getContext('2d');
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: predictionsData.map(p => p.month),
+                    datasets: [{
+                        label: 'Predicted Sales ($)',
+                        data: predictionsData.map(p => p.predicted_sales),
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: 'Confidence Lower',
+                        data: predictionsData.map(p => p.confidence_lower),
+                        borderColor: 'rgba(255, 99, 132, 0.5)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        fill: false,
+                        pointRadius: 0
+                    }, {
+                        label: 'Confidence Upper',
+                        data: predictionsData.map(p => p.confidence_upper),
+                        borderColor: 'rgba(255, 99, 132, 0.5)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        fill: false,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '12-Month Sales Forecast',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            }
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        });
+        {% endif %}
+
         function switchTab(event, tabName) {
             event.preventDefault();
             

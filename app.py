@@ -18,7 +18,9 @@ from data_storage import init_sales_db, store_sales_data, get_user_sales_data, d
 from data_analysis import perform_eda, get_monthly_trends, get_seasonal_patterns, get_peak_and_low_periods, get_store_analysis
 from data_visualization import create_all_visualizations, create_sales_over_time_plot, create_seasonality_plot, create_seasonal_breakdown_plot, create_store_performance_plot, create_yearly_comparison_plot, create_distribution_plot
 # from models.arima_model import arima_forecast, sarima_forecast, evaluate_model
-from models.arima_model import fit_arima, forecast_n_months, generate_forecast_summary, arima_forecast, sarima_forecast, evaluate_model, random_forest_forecast
+# from models.arima_model import fit_arima, forecast_n_months, generate_forecast_summary, arima_forecast, sarima_forecast, evaluate_model, random_forest_forecast
+from models.sales_predictor import SalesPredictor, train_sales_model_from_csv, predict_sales_from_csv
+from models.random_forest_model import clean_data, feature_engineering, train_model, generate_future_dates, predict_future, create_forecast_plot, get_insights
 from forecast_visualization import ForecastVisualizer, create_forecast_json_chart
 from recommendation_engine import RecommendationEngine, create_recommendations_json
 from error_handlers import (
@@ -31,8 +33,98 @@ from error_handlers import (
 )
 from io import StringIO
 
+
+def generate_future_predictions(df, model_path=None):
+    """Generate predictions for next 365 days using Random Forest model with store info"""
+    try:
+        # Extract store information from original data
+        store_list = []
+        store_name = "All Stores"
+        if 'Store' in df.columns:
+            store_list = df['Store'].unique()
+            if len(store_list) == 1:
+                store_name = f"Store {store_list[0]}"
+            else:
+                store_name = f"Combined ({len(store_list)} stores)"
+        
+        # Handle complex data format - aggregate sales by date if needed
+        if 'Weekly_Sales' in df.columns and 'Date' in df.columns:
+            # Aggregate sales by date for time series forecasting
+            df_simple = df.groupby('Date')['Weekly_Sales'].sum().reset_index()
+            df_simple = df_simple.rename(columns={'Weekly_Sales': 'Sales'})
+        else:
+            # Try to map common column names
+            date_col = None
+            sales_col = None
+            for col in df.columns:
+                if 'date' in col.lower():
+                    date_col = col
+                if 'sales' in col.lower() or 'weekly' in col.lower():
+                    sales_col = col
+
+            if date_col and sales_col:
+                df_simple = df[[date_col, sales_col]].copy()
+                df_simple = df_simple.rename(columns={date_col: 'Date', sales_col: 'Sales'})
+                # Aggregate if there are multiple sales per date
+                if df_simple['Date'].duplicated().any():
+                    df_simple = df_simple.groupby('Date')['Sales'].sum().reset_index()
+            else:
+                raise ValueError("Dataset must contain Date and Sales columns")
+
+        # Clean and prepare data
+        cleaned_df = clean_data(df_simple)
+        engineered_df = feature_engineering(cleaned_df)
+
+        # Get the last date for future predictions
+        last_date = pd.to_datetime(cleaned_df['Date'].max())
+
+        # Train the model
+        trained_model = train_model(engineered_df)
+
+        # Generate future dates
+        future_dates = generate_future_dates(365, last_date)
+
+        # Make predictions
+        predictions_df = predict_future(trained_model, future_dates, last_date)
+
+        # Convert to the format expected by the template
+        predictions = []
+        for idx, row in predictions_df.iterrows():
+            pred_date = row['Date']
+
+            predictions.append({
+                'date': pred_date.strftime('%Y-%m-%d'),
+                'predicted_sales': float(row['Predicted_Sales']),
+                'month': pred_date.strftime('%B %Y'),
+                'store_name': store_name,
+                'stores': list(store_list) if len(store_list) > 0 else [],
+                'confidence_lower': float(row['Predicted_Sales'] * 0.9),  # Simplified confidence
+                'confidence_upper': float(row['Predicted_Sales'] * 1.1)
+            })
+
+        # Get insights
+        insights = get_insights(predictions_df)
+
+        return predictions, trained_model, insights
+
+    except Exception as e:
+        app_logger.error(f"Error generating future predictions: {str(e)}")
+        return [], None, {}
+
+
 app = Flask(__name__)
 app.config.from_object(Config)
+
+# Register custom Jinja2 filters
+@app.template_filter('average')
+def average_filter(values):
+    """Calculate the average of a list of values."""
+    if not values or len(values) == 0:
+        return 0
+    try:
+        return sum(values) / len(values)
+    except (TypeError, ValueError):
+        return 0
 
 def login_required(f):
     @wraps(f)
@@ -367,20 +459,27 @@ def dashboard():
             flash('Upload a dataset to enable analysis, forecasting, and recommendations.', 'info')
 
         stats = {}
-        if df is not None and not df.empty:
+        if df is not None and not df.empty and upload_completed:
             stats = get_data_stats(df)
             stats['data_source'] = f"Data loaded from {data_source.title()} Dataset"
             user_info = session.get('user_id', 'guest')
             app_logger.info(f"Dashboard loaded for user {user_info} with {len(df)} records")
         else:
             user_info = session.get('user_id', 'guest')
-            app_logger.warning(f"Dashboard accessed but no data available for user {user_info}")
+            if not upload_completed:
+                app_logger.info(f"Dashboard accessed by user {user_info} - no upload yet (as expected)")
+            else:
+                app_logger.warning(f"Dashboard accessed but no data available for user {user_info}")
         
         return render_template('dashboard_improved.html', 
                              stats=stats, 
                              stores=store_summary.to_dict('records') if store_summary is not None else [], 
                              data_source=data_source, 
-                             preprocessing_stats=preprocessing_stats)
+                             preprocessing_stats=preprocessing_stats,
+                             data_uploaded=upload_completed,
+                             training_results=session.get('training_results', {}),
+                             insights=session.get('insights', {}),
+                             recommendations=session.get('insights', {}).get('recommendations', []))
     except Exception as e:
         # don't send user away from dashboard; show them the page with an error message
         app_logger.error(f"Error loading dashboard: {str(e)}", exc_info=True)
@@ -390,7 +489,11 @@ def dashboard():
                              stats={},
                              stores=[],
                              data_source=data_source,
-                             preprocessing_stats=preprocessing_stats)
+                             preprocessing_stats=preprocessing_stats,
+                             data_uploaded=upload_completed,
+                             training_results=session.get('training_results', {}),
+                             insights=session.get('insights', {}),
+                             recommendations=session.get('insights', {}).get('recommendations', []))
 
 
 @app.route('/upload', methods=['GET', 'POST'])
@@ -474,9 +577,83 @@ def upload():
                     global upload_completed
                     upload_completed = True
                     
+                    # ⚡ AUTOMATIC COMPLETE ANALYSIS & PREDICTIONS ⚡
+                    try:
+                        app_logger.info(f"Starting automatic complete analysis for user {user_id}")
+                        
+                        # Step 1: Perform EDA (Exploratory Data Analysis)
+                        try:
+                            eda_results = perform_eda(df)
+                            session['eda_results'] = eda_results
+                            app_logger.info(f"EDA completed for user {user_id}")
+                        except Exception as eda_error:
+                            app_logger.warning(f"EDA failed: {str(eda_error)}")
+                            session['eda_results'] = {}
+                        
+                        # Step 2: Get monthly trends
+                        try:
+                            monthly_trends = get_monthly_trends(df)
+                            session['monthly_trends'] = monthly_trends
+                        except Exception as trend_error:
+                            app_logger.warning(f"Monthly trends failed: {str(trend_error)}")
+                            session['monthly_trends'] = {}
+                        
+                        # Step 3: Get seasonal patterns
+                        try:
+                            seasonal_patterns = get_seasonal_patterns(df)
+                            session['seasonal_patterns'] = seasonal_patterns
+                        except Exception as seasonal_error:
+                            app_logger.warning(f"Seasonal patterns failed: {str(seasonal_error)}")
+                            session['seasonal_patterns'] = {}
+                        
+                        # Step 4: Get peak periods
+                        try:
+                            peak_periods = get_peak_and_low_periods(df)
+                            session['peak_periods'] = peak_periods
+                        except Exception as peak_error:
+                            app_logger.warning(f"Peak periods failed: {str(peak_error)}")
+                            session['peak_periods'] = {}
+                        
+                        # Step 5: Get store analysis
+                        try:
+                            if 'Store' in df.columns:
+                                store_analysis = get_store_analysis(df)
+                                session['store_analysis'] = store_analysis
+                        except Exception as store_error:
+                            app_logger.warning(f"Store analysis failed: {str(store_error)}")
+                            session['store_analysis'] = {}
+                        
+                        # Step 6: Train Random Forest model
+                        model_save_path = os.path.join('models', f"sales_predictor_{user_id}.joblib")
+                        os.makedirs('models', exist_ok=True)
+                        
+                        training_result = train_sales_model_from_csv(upload_filepath, model_save_path)
+                        
+                        if training_result['success']:
+                            # Store training results in session
+                            session['training_results'] = training_result['results']
+                            session['model_trained'] = True
+                            session['model_path'] = model_save_path
+
+                            # Step 7: Generate predictions for next 365 days
+                            future_predictions, trained_model, insights = generate_future_predictions(df)
+                            session['future_predictions'] = future_predictions
+                            session['trained_model'] = trained_model
+                            session['insights'] = insights
+
+                            app_logger.info(f"✅ Complete analysis done! Model trained and {len(future_predictions)} predictions generated for user {user_id}")
+                        else:
+                            app_logger.warning(f"Model training failed for user {user_id}: {training_result.get('error', 'Unknown error')}")
+
+                    except Exception as analysis_error:
+                        app_logger.error(f"Error during automatic analysis: {str(analysis_error)}")
+                        # Continue with upload even if analysis fails
+                    
                     app_logger.info(f"User {user_id} uploaded file '{filename}' with {len(df)} records")
-                    flash(f'✅ File uploaded successfully! {message}', 'success')
-                    return redirect(url_for('forecast'))
+                    flash(f'✅ File uploaded and ML model trained successfully! {message}', 'success')
+                    
+                    # Redirect to predictions page to show immediate results
+                    return redirect(url_for('predictions'))
                     
                 except Exception as data_error:
                     app_logger.error(f"Error processing uploaded data: {str(data_error)}")
@@ -504,7 +681,7 @@ def upload():
     
     # after a GET or a failed POST we still render upload page
     # if the upload just succeeded, the flag will already have been set above
-    return render_template('upload_improved.html', data_source=data_source)
+    return render_template('upload_improved.html', data_source=data_source, data_uploaded=upload_completed)
 
 
 @app.route('/analysis')
@@ -514,7 +691,10 @@ def analysis():
         flash('Please upload a dataset before accessing analysis.', 'error')
         return redirect(url_for('upload'))
     stores = df['Store'].unique().tolist()
-    return render_template('analysis_improved.html', stores=stores)
+    return render_template('analysis_improved.html', 
+                          stores=stores, 
+                          data_uploaded=upload_completed,
+                          training_results=session.get('training_results', {}))
 
 
 @app.route('/api/eda-summary')
@@ -793,99 +973,91 @@ def plot_dist():
     return response
 
 
+@app.route('/api/forecast-data')
+@login_required
+@handle_errors
+def api_forecast_data():
+    """Return historical and forecast data in JSON or CSV format."""
+    validate_data_available(df)
+
+    # Normalize and sort history
+    history_df = df.copy()
+    if 'Date' in history_df.columns:
+        history_df['Date'] = pd.to_datetime(history_df['Date'], errors='coerce')
+        history_df = history_df.dropna(subset=['Date']).sort_values('Date')
+
+    sales_column = 'Weekly_Sales' if 'Weekly_Sales' in history_df.columns else 'Sales' if 'Sales' in history_df.columns else None
+    if sales_column is None:
+        raise DataLoadError('No Sales column found in dataset for forecast output.')
+
+    historical_payload = {
+        'dates': history_df['Date'].astype(str).tolist(),
+        'values': history_df[sales_column].astype(float).tolist(),
+        'records': len(history_df)
+    }
+
+    # Use cached forecast state if available
+    forecast_items = session.get('future_predictions') or []
+    if not forecast_items:
+        try:
+            forecast_items, _, _ = generate_future_predictions(df)
+        except Exception as e:
+            app_logger.error(f"Unable to generate forecast data: {e}", exc_info=True)
+            raise DataLoadError(f"Unable to generate forecast data: {e}")
+
+    forecast_payload = {
+        'dates': [item.get('date') for item in forecast_items],
+        'values': [item.get('predicted_sales') for item in forecast_items],
+        'records': len(forecast_items)
+    }
+
+    if request.args.get('download', '0').lower() in ['1', 'true', 'yes']:
+        from io import StringIO
+        import csv
+
+        si = StringIO()
+        writer = csv.writer(si)
+        writer.writerow(['date', 'predicted_sales'])
+        for d, v in zip(forecast_payload['dates'], forecast_payload['values']):
+            writer.writerow([d, v])
+
+        csv_response = make_response(si.getvalue())
+        csv_response.headers['Content-Type'] = 'text/csv'
+        csv_response.headers['Content-Disposition'] = 'attachment; filename=forecast_data.csv'
+        return csv_response
+
+    mean_sales = float(np.mean(historical_payload['values'])) if historical_payload['values'] else 0.0
+    forecast_months = [pd.to_datetime(date).strftime('%B %Y') for date in forecast_payload['dates']] if forecast_payload['dates'] else []
+
+    return jsonify({
+        'success': True,
+        'historical': historical_payload,
+        'forecast': forecast_payload,
+        'mean_sales': mean_sales,
+        'forecast_months': forecast_months,
+        'training_results': session.get('training_results', {}),
+        'insights': session.get('insights', {})
+    })
+
+
+@app.route('/api/forecast')
+@login_required
+@handle_errors
+def api_forecast():
+    """Backward-compatible alias for `/api/forecast-data`."""
+    return api_forecast_data()
+
 
 @app.route('/forecast')
 @login_required
-def forecast():
-    """Display forecast visualization page"""
-    if df is None or not upload_completed:
-        flash('Please upload a dataset before viewing the forecast.', 'error')
-        return redirect(url_for('upload'))
-
-    import os
-    from flask import current_app
-    plot_dir = os.path.join(current_app.root_path, 'static', 'plots')
-    def plot_exists(filename):
-        return os.path.exists(os.path.join(plot_dir, filename))
-
-    # Check for each expected plot
-    historical_vs_forecast = plot_exists('historical_vs_forecast.png')
-    confidence_intervals = plot_exists('confidence_intervals.png')
-    forecast_statistics = plot_exists('forecast_statistics.png')
-    scenario_comparison = plot_exists('scenario_comparison.png')
-
-    # Optionally, you can add stats if you want to show them
-
-    # Compute forecast statistics for template using user data if available
-    forecast_mean = forecast_min = forecast_max = forecast_periods = None
-    ci_avg_width = None
-    model_used = rmse = mae = None
-    baseline_mean = pessimistic_mean = optimistic_mean = None
-
-    try:
-        user_id = session.get('user_id')
-        from data_storage import get_user_sales_data
-        user_df = get_user_sales_data(user_id)
-        use_df = None
-        if user_df is not None and not user_df.empty:
-            user_df['Date'] = pd.to_datetime(user_df['date']) if 'date' in user_df.columns else pd.to_datetime(user_df['Date'])
-            user_df['Weekly_Sales'] = user_df['sales'] if 'sales' in user_df.columns else user_df['Weekly_Sales']
-            use_df = user_df.rename(columns={'Date': 'Date', 'Weekly_Sales': 'Weekly_Sales'})
-        else:
-            use_df = df
-
-        # Only use user data if it has at least 3 months of data
-        df_copy = use_df.copy()
-        df_copy['Date'] = pd.to_datetime(df_copy['Date'])
-        df_copy = df_copy.sort_values('Date')
-        ts_data = df_copy.groupby('Date')['Weekly_Sales'].sum()
-        ts_monthly = ts_data.resample('MS').sum()
-        if len(ts_monthly) < 3:
-            raise Exception('Insufficient data for forecasting')
-        # train on the full series so predictions reflect the latest trend
-        ts_train = ts_monthly
-        # Use Random Forest instead of ARIMA
-        rf_result = random_forest_forecast(ts_train, steps=12)
-        forecast_df = pd.DataFrame({
-            'forecast': rf_result['forecast'],
-            'lower_ci': rf_result['conf_int']['lower'],
-            'upper_ci': rf_result['conf_int']['upper']
-        })
-        forecast_mean = float(forecast_df['forecast'].mean())
-        forecast_min = float(forecast_df['forecast'].min())
-        forecast_max = float(forecast_df['forecast'].max())
-        forecast_periods = len(forecast_df)
-        ci_avg_width = float((forecast_df['upper_ci'] - forecast_df['lower_ci']).mean())
-        model_used = 'Random Forest'
-        # For Random Forest, we don't have fitted values like ARIMA, so skip evaluation
-        rmse = None
-        mae = None
-        # Scenario means
-        baseline_mean = forecast_mean
-        pessimistic_mean = float(forecast_df['forecast'].mean() * 0.95)
-        optimistic_mean = float(forecast_df['forecast'].mean() * 1.05)
-    except Exception as e:
-        # If any error, leave stats as None
-        pass
-
+def forecast_page():
+    """Render forecast page template."""
     return render_template(
-        'forecast_improved.html',
-        generated_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        historical_vs_forecast=historical_vs_forecast,
-        confidence_intervals=confidence_intervals,
-        forecast_statistics=forecast_statistics,
-        scenario_comparison=scenario_comparison,
-        forecast_mean=forecast_mean,
-        forecast_min=forecast_min,
-        forecast_max=forecast_max,
-        forecast_periods=forecast_periods,
-        ci_avg_width=ci_avg_width,
-        model_used=model_used,
-        rmse=rmse,
-        mae=mae,
-        baseline_mean=baseline_mean,
-        pessimistic_mean=pessimistic_mean,
-        optimistic_mean=optimistic_mean
+        'forecast_enhanced.html',
+        data_uploaded=upload_completed,
+        training_results=session.get('training_results', {}),
+        insights=session.get('insights', {}),
+        future_predictions=session.get('future_predictions', [])
     )
 
 
@@ -974,181 +1146,6 @@ def generate_visualizations():
         }), 500
 
 
-@app.route('/api/forecast')
-@handle_errors
-def api_forecast():
-    """Get 12-month sales forecast with fallback strategies."""
-    validate_data_available(df)
-    
-    try:
-        # Prepare time series
-        df_copy = df.copy()
-        df_copy['Date'] = pd.to_datetime(df_copy['Date'])
-        df_copy = df_copy.sort_values('Date')
-        
-        # Aggregate daily sales
-        ts_data = df_copy.groupby('Date')['Weekly_Sales'].sum()
-        
-        # Resample to monthly (sum of sales per month)
-        ts_monthly = ts_data.resample('MS').sum()
-        
-        # Ensure sufficient data
-        if len(ts_monthly) < 3:
-            raise InsufficientDataError(
-                'Insufficient data for forecasting (need at least 3 months)',
-                required=3,
-                actual=len(ts_monthly)
-            )
-        
-        # Split data - use 75% for training
-        train_size = max(3, int(len(ts_monthly) * 0.75))
-        ts_train = ts_monthly.iloc[:train_size]
-        
-        # Try Random Forest model
-        try:
-            forecast_result = random_forest_forecast(ts_train, n_months=12)
-            app_logger.info(f"Random Forest forecast generated successfully for {len(ts_monthly)} months of data")
-        except Exception as model_error:
-            app_logger.warning(f"Random Forest model failed, using fallback: {str(model_error)}")
-            # Use fallback recovery
-            recovery_result = ErrorRecoveryStrategy.on_model_training_failure(model_error, 'simple_average')
-            
-            if not recovery_result['success']:
-                raise ModelTrainingError(
-                    "Forecast model training failed and fallback unavailable",
-                    model_type='Random Forest',
-                    details={'original_error': str(model_error)}
-                )
-            
-            # Simple average fallback
-            forecast_data = []
-            avg_sales = float(ts_train.mean())
-            std_sales = float(ts_train.std())
-            
-            for i in range(12):
-                forecast_data.append({
-                    'month': i + 1,
-                    'forecast': avg_sales,
-                    'conf_low': max(0, avg_sales - (2 * std_sales)),
-                    'conf_high': avg_sales + (2 * std_sales)
-                })
-            
-            return jsonify({
-                'forecast': forecast_data,
-                'mean_sales': float(df['Weekly_Sales'].mean()),
-                'model_summary': 'Fallback Model (Simple Average)',
-                'success': True,
-                'note': 'Using fallback model due to insufficient data for Random Forest'
-            })
-        
-        # Format forecast data
-        forecast_data = []
-        forecast_series = forecast_result['forecast']
-        conf_int = forecast_result['conf_int']
-        for i in range(len(forecast_series)):
-            forecast_data.append({
-                'month': i + 1,
-                'forecast': float(max(0, forecast_series.iloc[i])),
-                'conf_low': float(max(0, conf_int.iloc[i]['lower'])),
-                'conf_high': float(max(0, conf_int.iloc[i]['upper']))
-            })
-        
-        return jsonify({
-            'forecast': forecast_data,
-            'mean_sales': float(df['Weekly_Sales'].mean()),
-            'model_summary': 'Random Forest Regression',
-            'success': True
-        })
-        
-    except (InsufficientDataError, ModelTrainingError) as e:
-        app_logger.error(f"Forecast error: {e.message}")
-        raise
-    except Exception as e:
-        app_logger.error(f"Unexpected error in forecast API: {str(e)}", exc_info=True)
-        raise DataLoadError(
-            f"Failed to generate forecast: {str(e)}",
-            details={'original_error': str(e)}
-        )
-
-
-@app.route('/api/forecast-data')
-@login_required
-@handle_errors
-def get_forecast_data():
-    """Get forecast data as JSON for charting libraries.
-
-    If the query string contains ``download=1`` the handler will return a CSV
-    attachment identical to the legacy ``download_forecast_csv`` endpoint.
-    """
-    validate_data_available(df)
-    
-    try:
-        # Prepare time series
-        df_copy = df.copy()
-        df_copy['Date'] = pd.to_datetime(df_copy['Date'])
-        df_copy = df_copy.sort_values('Date')
-        ts_data = df_copy.groupby('Date')['Weekly_Sales'].sum()
-        
-        # Resample to monthly
-        ts_monthly = ts_data.resample('MS').sum()
-        
-        if len(ts_monthly) < 3:
-            raise InsufficientDataError(
-                'Insufficient data for forecast visualization',
-                required=3,
-                actual=len(ts_monthly)
-            )
-        
-        # use entire monthly series for training so that forecasts leverage
-        # all available history.  Previously we held back 25% solely for
-        # evaluation which confused users by making the red "forecast" line
-        # follow only part of the data.
-        ts_train = ts_monthly
-        
-        # Train and forecast on full history using Random Forest
-        rf_result = random_forest_forecast(ts_train, steps=12)
-        forecast_result = {
-            'forecast_df': pd.DataFrame({
-                'forecast': rf_result['forecast'],
-                'lower_ci': rf_result['conf_int']['lower'],
-                'upper_ci': rf_result['conf_int']['upper']
-            })
-        }
-
-        # if the user requested a CSV download, build and return it
-        if request.args.get('download'):
-            from io import StringIO
-            from flask import Response
-            forecast_df = forecast_result.get('forecast_df').copy()
-            forecast_df = forecast_df.reset_index()
-            forecast_df.rename(columns={'index': 'date'}, inplace=True)
-            csv_buffer = StringIO()
-            forecast_df.to_csv(csv_buffer, index=False)
-            csv_buffer.seek(0)
-            return Response(
-                csv_buffer.getvalue(),
-                mimetype='text/csv',
-                headers={
-                    'Content-Disposition': 'attachment;filename=forecast_data.csv'
-                }
-            )
-        
-        # otherwise return JSON for charting
-        chart_data = create_forecast_json_chart(ts_train, forecast_result)
-        
-        return jsonify(chart_data)
-        
-    except InsufficientDataError as e:
-        app_logger.warning(f"Insufficient data for forecast: {e.message}")
-        raise
-    except Exception as e:
-        app_logger.error(f"Error generating forecast data: {str(e)}")
-        raise DataLoadError(
-            f"Failed to generate forecast data: {str(e)}"
-        )
-
-
-
 @app.route('/recommendation')
 @login_required
 def recommendation():
@@ -1201,6 +1198,10 @@ def recommendation():
             'position': {'value': recommendations.get('competitive_positioning', {}).get('market_position', ''), 'description': 'Market position insight'}
         }
 
+        # Get ML predictions from session if available
+        ml_predictions = session.get('future_predictions', [])
+        training_results = session.get('training_results', {})
+
         app_logger.info(f"Recommendations generated for user {user_id}")
 
         return render_template(
@@ -1209,7 +1210,11 @@ def recommendation():
             recommendations=recommendations,
             stock_recommendations=stock_recommendations,
             festival_recommendations=festival_recommendations,
-            insights=insights
+            insights=insights,
+            ml_predictions=ml_predictions,
+            training_results=training_results,
+            model_trained=session.get('model_trained', False),
+            data_uploaded=upload_completed
         )
 
     except (DataLoadError, InsufficientDataError) as e:
@@ -1401,10 +1406,440 @@ def unified_analysis_api():
         
         app_logger.info(f"Analysis API returning data for {total_records} records from {len(store_stats)} stores")
         return jsonify(response_data)
-        
+
     except Exception as e:
         app_logger.error(f"Error in unified analysis API: {str(e)}", exc_info=True)
         raise DataLoadError(f"Failed to generate analysis: {str(e)}")
+
+
+@app.route('/predictions')
+@login_required
+def predictions():
+    """Display ML predictions page with ALL automatic analysis results"""
+    if not session.get('model_trained', False):
+        flash('Please upload a dataset first to see predictions.', 'warning')
+        return redirect(url_for('upload'))
+    
+    # Get ALL analysis results from session
+    ml_predictions = session.get('future_predictions', [])
+    training_results = session.get('training_results', {})
+    insights = session.get('insights', {})
+    trained_model = session.get('trained_model', {})
+    
+    # Get automatic analysis results
+    eda_results = session.get('eda_results', {})
+    seasonal_patterns = session.get('seasonal_patterns', {})
+    peak_periods = session.get('peak_periods', {})
+    monthly_trends = session.get('monthly_trends', {})
+    store_analysis = session.get('store_analysis', {})
+
+    if not ml_predictions:
+        flash('No predictions available. Please try uploading your data again.', 'error')
+        return redirect(url_for('upload'))
+
+    return render_template(
+        'predictions.html',
+        ml_predictions=ml_predictions,
+        training_results=training_results,
+        insights=insights,
+        feature_importance=trained_model.get('feature_importance', {}) if trained_model else {},
+        model_trained=True,
+        data_uploaded=upload_completed,
+        # ⚡ Automatic Analysis Results ⚡
+        eda_results=eda_results,
+        seasonal_patterns=seasonal_patterns,
+        peak_periods=peak_periods,
+        monthly_trends=monthly_trends,
+        store_analysis=store_analysis
+    )
+
+
+# =====================================================
+# SALES PREDICTION ROUTES (Random Forest)
+# =====================================================
+
+@app.route('/sales-predictor')
+@login_required
+def sales_predictor():
+    """Redirect to predictions page (no separate ML predictor needed)"""
+    return redirect(url_for('predictions'))
+
+
+@app.route('/complete-analysis-page')
+@login_required
+def complete_analysis_page():
+    """Display complete analysis page - one step analysis"""
+    return render_template('complete_analysis.html')
+
+
+@app.route('/api/train-sales-model', methods=['POST'])
+@login_required
+@handle_errors
+def train_sales_model():
+    """Train Random Forest model on uploaded CSV data or stored user data"""
+    try:
+        user_id = session.get('user_id')
+        
+        # Check if file is uploaded
+        if 'file' not in request.files or request.files['file'].filename == '':
+            # No file uploaded, use stored user data
+            app_logger.info(f"No file uploaded, using stored data for user {user_id}")
+            
+            # Get stored user data
+            df = get_user_sales_data(user_id)
+            if df.empty:
+                raise FileUploadError("No stored data found. Please upload data first or provide a training file.")
+            
+            # Convert stored data to CSV format for training
+            import io
+            csv_buffer = io.StringIO()
+            df.to_csv(csv_buffer, index=False)
+            csv_content = csv_buffer.getvalue()
+            
+            # Save to temp file
+            temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f"stored_data_{user_id}.csv")
+            with open(temp_path, 'w') as f:
+                f.write(csv_content)
+        else:
+            # File uploaded, use it
+            file = request.files['file']
+            if not allowed_file(file.filename):
+                raise FileUploadError("Invalid file type. Please upload a CSV file.")
+
+            # Save uploaded file temporarily
+            filename = secure_filename(file.filename)
+            temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f"temp_{session['user_id']}_{filename}")
+            file.save(temp_path)
+
+        # Train model
+        model_save_path = os.path.join('models', f"sales_predictor_{session['user_id']}.joblib")
+        os.makedirs('models', exist_ok=True)
+
+        result = train_sales_model_from_csv(temp_path, model_save_path)
+
+        # Clean up temp file
+        os.remove(temp_path)
+
+        if not result['success']:
+            raise ModelTrainingError(f"Model training failed: {result['error']}")
+
+        # Store training results in session for display
+        session['training_results'] = result['results']
+        session['model_trained'] = True
+
+        app_logger.info(f"Random Forest model trained successfully for user {session['user_id']}")
+
+        return jsonify({
+            'success': True,
+            'message': 'Model trained successfully!',
+            'results': result['results']
+        })
+
+    except Exception as e:
+        app_logger.error(f"Error training sales model: {str(e)}")
+        raise
+
+
+@app.route('/api/predict-sales', methods=['POST'])
+@login_required
+@handle_errors
+def predict_sales():
+    """Make predictions using trained Random Forest model"""
+    try:
+        user_id = session.get('user_id')
+        
+        # Check if model is trained
+        if not session.get('model_trained', False):
+            raise ModelTrainingError("No trained model found. Please train a model first.")
+
+        model_path = os.path.join('models', f"sales_predictor_{session['user_id']}.joblib")
+        if not os.path.exists(model_path):
+            raise ModelTrainingError("Model file not found. Please train a model first.")
+
+        # Get prediction data
+        if 'file' not in request.files or request.files['file'].filename == '':
+            # No file uploaded, use stored user data for prediction
+            app_logger.info(f"No prediction file uploaded, using stored data for user {user_id}")
+            
+            # Get stored user data
+            df = get_user_sales_data(user_id)
+            if df.empty:
+                raise FileUploadError("No stored data found. Please upload data first or provide a prediction file.")
+            
+            # Convert stored data to CSV format for prediction
+            import io
+            csv_buffer = io.StringIO()
+            df.to_csv(csv_buffer, index=False)
+            csv_content = csv_buffer.getvalue()
+            
+            # Save to temp file
+            temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f"pred_stored_data_{user_id}.csv")
+            with open(temp_path, 'w') as f:
+                f.write(csv_content)
+        else:
+            # File uploaded, use it
+            file = request.files['file']
+            if not allowed_file(file.filename):
+                raise FileUploadError("Invalid file type. Please upload a CSV file.")
+
+            # Save prediction file temporarily
+            filename = secure_filename(file.filename)
+            temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f"pred_{session['user_id']}_{filename}")
+            file.save(temp_path)
+
+        # Make predictions
+        result = predict_sales_from_csv(model_path, temp_path)
+
+        # Clean up temp file
+        os.remove(temp_path)
+
+        if not result['success']:
+            raise ModelTrainingError(f"Prediction failed: {result['error']}")
+
+        app_logger.info(f"Sales predictions generated for user {session['user_id']}: {result['n_predictions']} predictions")
+
+        return jsonify({
+            'success': True,
+            'predictions': result['predictions'],
+            'n_predictions': result['n_predictions']
+        })
+
+    except Exception as e:
+        app_logger.error(f"Error making sales predictions: {str(e)}")
+        raise
+
+
+@app.route('/api/sales-model-status')
+@login_required
+def sales_model_status():
+    """Check if user has a trained sales prediction model"""
+    model_path = os.path.join('models', f"sales_predictor_{session['user_id']}.joblib")
+    has_model = os.path.exists(model_path)
+
+    training_results = session.get('training_results', None)
+
+    return jsonify({
+        'has_model': has_model,
+        'training_results': training_results,
+        'model_trained': session.get('model_trained', False)
+    })
+
+
+@app.route('/api/cached-predictions')
+@login_required
+def cached_predictions():
+    """Get cached predictions from the last trained model"""
+    if not session.get('model_trained', False):
+        return jsonify({
+            'success': False,
+            'error': 'No trained model available. Please upload data first.',
+            'model_trained': False
+        }), 400
+    
+    ml_predictions = session.get('future_predictions', [])
+    training_results = session.get('training_results', {})
+    insights = session.get('insights', {})
+    
+    return jsonify({
+        'success': True,
+        'model_trained': True,
+        'predictions': ml_predictions[:30] if ml_predictions else [],  # First 30 days
+        'total_predictions': len(ml_predictions),
+        'training_metrics': training_results,
+        'insights': insights
+    })
+
+
+@app.route('/api/future-sales-prediction', methods=['POST'])
+@login_required
+@handle_errors
+@require_json
+def future_sales_prediction():
+    """Predict future sales for given dates and products"""
+    try:
+        # Check if model is trained
+        if not session.get('model_trained', False):
+            raise ModelTrainingError("No trained model found. Please train a model first.")
+
+        model_path = os.path.join('models', f"sales_predictor_{session['user_id']}.joblib")
+        if not os.path.exists(model_path):
+            raise ModelTrainingError("Model file not found. Please train a model first.")
+
+        # Get request data
+        data = request.get_json()
+        future_dates = data.get('dates', [])
+        product_info = data.get('product_info', {})
+
+        if not future_dates:
+            raise DataValidationError("No future dates provided for prediction")
+
+        # Load model and make predictions
+        predictor = SalesPredictor()
+        predictor.load_model(model_path)
+
+        predictions_df = predictor.predict_future_sales(future_dates, product_info)
+
+        # Convert to list of dicts for JSON response
+        predictions = []
+        for _, row in predictions_df.iterrows():
+            predictions.append({
+                'date': row['date'].isoformat() if hasattr(row['date'], 'isoformat') else str(row['date']),
+                'predicted_sales': float(row['predicted_sales'])
+            })
+
+        app_logger.info(f"Future sales predictions generated for user {session['user_id']}: {len(predictions)} predictions")
+
+        return jsonify({
+            'success': True,
+            'predictions': predictions
+        })
+
+    except Exception as e:
+        app_logger.error(f"Error generating future sales predictions: {str(e)}")
+        raise
+
+
+@app.route('/api/complete-analysis', methods=['POST'])
+@login_required
+@handle_errors
+def complete_analysis():
+    """
+    Complete end-to-end analysis:
+    1. Upload and validate data
+    2. Perform EDA and preprocessing
+    3. Train Random Forest model
+    4. Generate future sales predictions
+    All in one request!
+    """
+    try:
+        user_id = session.get('user_id')
+        
+        # Step 1: Validate file upload
+        if 'file' not in request.files or request.files['file'].filename == '':
+            raise FileUploadError('No file provided')
+        
+        file = request.files['file']
+        
+        # Validate CSV file
+        is_valid, validation_message = validate_csv_file(file)
+        if not is_valid:
+            raise FileUploadError(validation_message, filename=file.filename if file else 'unknown')
+        
+        # Save temporarily
+        filename = secure_filename(file.filename)
+        if not filename:
+            raise FileUploadError('Invalid filename provided')
+        
+        temp_filepath = os.path.join(app.config['UPLOAD_FOLDER'], f'complete_temp_{user_id}_{filename}')
+        file.save(temp_filepath)
+        
+        try:
+            # Step 2: Validate and preprocess CSV
+            is_valid, message, validated_df = validate_csv_structure(temp_filepath)
+            if not is_valid:
+                raise DataValidationError(f"CSV validation failed: {message}", field='file')
+            
+            if validated_df is None or validated_df.empty:
+                raise DataValidationError("CSV file contains no valid data", field='file')
+            
+            # Preprocess data
+            df_processed, preprocessing_stats = preprocess_data(validated_df)
+            
+            # Perform EDA
+            eda_results = perform_eda(df_processed)
+            
+            # Step 3: Store data in database
+            delete_user_sales_data(user_id)
+            store_sales_data(user_id, df_processed)
+            
+            app_logger.info(f"Data analysis completed for user {user_id}: {len(df_processed)} records processed")
+            
+            # Step 4: Train model
+            model_save_path = os.path.join('models', f"sales_predictor_{user_id}.joblib")
+            os.makedirs('models', exist_ok=True)
+            
+            training_result = train_sales_model_from_csv(temp_filepath, model_save_path)
+            
+            if not training_result['success']:
+                raise ModelTrainingError(f"Model training failed: {training_result['error']}")
+            
+            training_results = training_result['results']
+            session['model_trained'] = True
+            session['training_results'] = training_results
+            
+            app_logger.info(f"Model trained successfully for user {user_id}")
+            
+            # Step 5: Generate future predictions
+            # Generate predictions for next 365 days
+            predictor = training_result['predictor']
+            
+            # Create future dates (next 365 days)
+            from datetime import datetime, timedelta
+            start_date = datetime.now()
+            future_dates = [start_date + timedelta(days=i) for i in range(365)]
+            
+            # Generate predictions using existing data pattern
+            predictions_df = predictor.predict_future_sales(future_dates)
+            
+            # Convert predictions to list of dicts
+            predictions_list = []
+            if isinstance(predictions_df, pd.DataFrame):
+                for _, row in predictions_df.iterrows():
+                    predictions_list.append({
+                        'date': row.get('date', row.get('Date', '')).isoformat() if hasattr(row.get('date', row.get('Date', '')), 'isoformat') else str(row.get('date', row.get('Date', ''))),
+                        'predicted_sales': float(row.get('predicted_sales', row.get('Weekly_Sales', 0)))
+                    })
+            elif isinstance(predictions_df, (list, np.ndarray)):
+                # If it's just values, create dates
+                predictions_list = [
+                    {
+                        'date': (start_date + timedelta(days=i)).isoformat(),
+                        'predicted_sales': float(pred)
+                    }
+                    for i, pred in enumerate(predictions_df[:365])
+                ]
+            
+            app_logger.info(f"Future predictions generated for user {user_id}: {len(predictions_list)} predictions")
+            
+            # Clean up temp file
+            if os.path.exists(temp_filepath):
+                os.remove(temp_filepath)
+            
+            # Return comprehensive results
+            return jsonify({
+                'success': True,
+                'message': 'Complete analysis finished! Data analyzed, model trained, and predictions generated.',
+                'data_summary': {
+                    'total_records': len(df_processed),
+                    'date_range': {
+                        'start': str(eda_results.get('min_date', 'N/A')),
+                        'end': str(eda_results.get('max_date', 'N/A'))
+                    },
+                    'avg_sales': float(eda_results.get('avg_sales', 0)),
+                    'total_sales': float(eda_results.get('total_sales', 0))
+                },
+                'preprocessing': preprocessing_stats,
+                'model_training': {
+                    'mse': training_results.get('mse'),
+                    'rmse': training_results.get('rmse'),
+                    'mae': training_results.get('mae'),
+                    'r2_score': training_results.get('r2_score'),
+                    'train_points': training_results.get('n_train_samples'),
+                    'test_points': training_results.get('n_test_samples')
+                },
+                'future_predictions': predictions_list[:30]  # First 30 days
+            })
+        
+        except Exception as e:
+            # Clean up temp file on error
+            if os.path.exists(temp_filepath):
+                os.remove(temp_filepath)
+            raise
+    
+    except Exception as e:
+        app_logger.error(f"Error in complete analysis: {str(e)}")
+        raise
+
 
 if __name__ == '__main__':
     init_db()

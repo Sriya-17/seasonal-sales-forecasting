@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Analysis - Seasonal Sales Forecasting</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+        
+        .step {
+            padding: 15px;
+            background: #ecf0f1;
+            border-radius: 6px;
+            border-left: 4px solid #3498db;
+            position: relative;
+        }
+        
+        .step.active {
+            border-left-color: #e74c3c;
+            background: #fdeae6;
+        }
+        
+        .step.done {
+            border-left-color: #27ae60;
+            background: #eafaf1;
+        }
+        
+        .step-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: #3498db;
+            color: white;
+            border-radius: 50%;
+            line-height: 30px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .step.done .step-number {
+            background: #27ae60;
+        }
+        
+        .step.active .step-number {
+            background: #e74c3c;
+        }
+        
+        .upload-section {
+            margin-bottom: 30px;
+            padding: 30px;
+            border: 2px dashed #3498db;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        
+        .upload-section h2 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+        
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+        
+        .file-input-label {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .file-input-label:hover {
+            background: #2980b9;
+        }
+        
+        #filename {
+            margin-left: 15px;
+            color: #27ae60;
+            font-weight: bold;
+        }
+        
+        .submit-btn {
+            display: block;
+            width: 200px;
+            margin: 30px auto;
+            padding: 15px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .submit-btn:hover {
+            background: #229954;
+        }
+        
+        .submit-btn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+        .results {
+            margin-top: 40px;
+            display: none;
+        }
+        
+        .results.show {
+            display: block;
+        }
+        
+        .result-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #27ae60;
+        }
+        
+        .result-section h3 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .result-item {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .result-label {
+            color: #7f8c8d;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        
+        .result-value {
+            color: #2c3e50;
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        
+        .predictions-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .predictions-table th {
+            background: #3498db;
+            color: white;
+            padding: 10px;
+            text-align: left;
+        }
+        
+        .predictions-table td {
+            padding: 10px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .predictions-table tr:hover {
+            background: #ecf0f1;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .spinner {
+            border: 4px solid #ecf0f1;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            color: #e74c3c;
+            background: #fadbd8;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            display: none;
+        }
+        
+        .error.show {
+            display: block;
+        }
+        
+        .success {
+            color: #27ae60;
+            background: #eafaf1;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            display: none;
+        }
+        
+        .success.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <nav style="background: #2c3e50; padding: 15px; color: white;">
+        <div style="max-width: 900px; margin: 0 auto;">
+            <a href="/dashboard" style="color: white; text-decoration: none; font-size: 18px;">← Back to Dashboard</a>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <h1>🚀 Complete Analysis Pipeline</h1>
+        <p class="subtitle">Upload your data once and we'll analyze it, train an ML model, and predict future sales - all in one step!</p>
+        
+        <div class="steps">
+            <div class="step done">
+                <div class="step-number">✓</div>
+                <div>Upload Data</div>
+            </div>
+            <div class="step done">
+                <div class="step-number">✓</div>
+                <div>Validate & Analyze</div>
+            </div>
+            <div class="step active">
+                <div class="step-number">3</div>
+                <div>Train Model</div>
+            </div>
+            <div class="step">
+                <div class="step-number">4</div>
+                <div>Predict Future</div>
+            </div>
+        </div>
+        
+        <form id="analysisForm" enctype="multipart/form-data">
+            <div class="upload-section">
+                <h2>📁 Select Your Sales Data</h2>
+                <p>Choose a CSV file with historical sales data containing Date and Sales columns.</p>
+                
+                <div class="file-input-wrapper">
+                    <label for="fileInput" class="file-input-label">Choose File</label>
+                    <input type="file" id="fileInput" name="file" accept=".csv" required>
+                </div>
+                <span id="filename">No file selected</span>
+            </div>
+            
+            <div class="error" id="errorMsg"></div>
+            <div class="success" id="successMsg"></div>
+            
+            <button type="submit" class="submit-btn" id="submitBtn">Start Complete Analysis</button>
+        </form>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing your data... This may take a moment.</p>
+            <p id="loadingStatus" style="font-size: 12px; color: #7f8c8d;">Initializing...</p>
+        </div>
+        
+        <div class="results" id="results">
+            <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 15px;">✅ Analysis Complete!</h2>
+            
+            <div class="result-section">
+                <h3>📊 Data Summary</h3>
+                <div class="result-grid">
+                    <div class="result-item">
+                        <div class="result-label">Total Records</div>
+                        <div class="result-value" id="totalRecords">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Average Daily Sales</div>
+                        <div class="result-value" id="avgSales">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Total Sales</div>
+                        <div class="result-value" id="totalSales">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Data Period</div>
+                        <div class="result-value" id="datePeriod" style="font-size: 14px;">-</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="result-section">
+                <h3>🤖 ML Model Performance</h3>
+                <div class="result-grid">
+                    <div class="result-item">
+                        <div class="result-label">R² Score</div>
+                        <div class="result-value" id="r2Score">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">RMSE</div>
+                        <div class="result-value" id="rmse">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">MAE</div>
+                        <div class="result-value" id="mae">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Test Samples</div>
+                        <div class="result-value" id="testSamples">-</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="result-section">
+                <h3>📈 Future Sales Predictions (Next 30 Days)</h3>
+                <table class="predictions-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Predicted Sales</th>
+                        </tr>
+                    </thead>
+                    <tbody id="predictionsBody">
+                        <!-- Predictions will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px;">
+                <a href="/dashboard" style="display: inline-block; padding: 12px 30px; background: #3498db; color: white; text-decoration: none; border-radius: 4px;">View Full Dashboard</a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // File input handler
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const filename = e.target.files[0]?.name || 'No file selected';
+            document.getElementById('filename').textContent = filename ? '✓ ' + filename : 'No file selected';
+        });
+        
+        // Form submission
+        document.getElementById('analysisForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showError('Please select a file');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            // Hide previous results
+            document.getElementById('results').classList.remove('show');
+            document.getElementById('errorMsg').classList.remove('show');
+            
+            // Show loading
+            const loading = document.getElementById('loading');
+            loading.classList.add('show');
+            document.getElementById('loadingStatus').textContent = 'Starting analysis...';
+            
+            // Disable submit button
+            document.getElementById('submitBtn').disabled = true;
+            
+            try {
+                const response = await fetch('/api/complete-analysis', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Server error');
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayResults(data);
+                    document.getElementById('results').classList.add('show');
+                    showSuccess(data.message || 'Analysis completed successfully!');
+                } else {
+                    throw new Error(data.error || 'Analysis failed');
+                }
+            } catch (error) {
+                showError('Error: ' + error.message);
+            } finally {
+                loading.classList.remove('show');
+                document.getElementById('submitBtn').disabled = false;
+            }
+        });
+        
+        function displayResults(data) {
+            // Data Summary
+            document.getElementById('totalRecords').textContent = data.data_summary?.total_records || '-';
+            document.getElementById('avgSales').textContent = '$' + (data.data_summary?.avg_sales || 0).toFixed(2);
+            document.getElementById('totalSales').textContent = '$' + (data.data_summary?.total_sales || 0).toFixed(2);
+            
+            const dateStart = data.data_summary?.date_range?.start?.split('T')[0] || '-';
+            const dateEnd = data.data_summary?.date_range?.end?.split('T')[0] || '-';
+            document.getElementById('datePeriod').textContent = dateStart + ' to ' + dateEnd;
+            
+            // Model Performance
+            document.getElementById('r2Score').textContent = (data.model_training?.r2_score || 0).toFixed(3);
+            document.getElementById('rmse').textContent = '$' + (data.model_training?.rmse || 0).toFixed(2);
+            document.getElementById('mae').textContent = '$' + (data.model_training?.mae || 0).toFixed(2);
+            document.getElementById('testSamples').textContent = data.model_training?.test_points || '-';
+            
+            // Predictions
+            const tbody = document.getElementById('predictionsBody');
+            tbody.innerHTML = '';
+            
+            if (data.future_predictions && Array.isArray(data.future_predictions)) {
+                data.future_predictions.forEach(pred => {
+                    const row = tbody.insertRow();
+                    const dateCell = row.insertCell(0);
+                    const salesCell = row.insertCell(1);
+                    
+                    dateCell.textContent = new Date(pred.date).toLocaleDateString();
+                    salesCell.textContent = '$' + pred.predicted_sales.toFixed(2);
+                });
+            }
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMsg');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('show');
+        }
+        
+        function showSuccess(message) {
+            const successDiv = document.getElementById('successMsg');
+            successDiv.textContent = message;
+            successDiv.classList.add('show');
+        }
+    </script>
+</body>
+</html>

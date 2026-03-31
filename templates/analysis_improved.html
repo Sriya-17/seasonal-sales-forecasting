@@ -326,9 +326,11 @@
         <ul class="nav-links">
             <li><a href="/dashboard">Dashboard</a></li>
             <li><a href="/upload">Upload</a></li>
+            {% if data_uploaded %}
             <li><a href="/analysis" class="active">Analysis</a></li>
-            <li><a href="/forecast">Forecast</a></li>
+            <li><a href="/predictions">View Predictions</a></li>
             <li><a href="/recommendation">Recommendations</a></li>
+            {% endif %}
             <li><a href="/logout">Logout</a></li>
         </ul>
     </header>
@@ -358,6 +360,34 @@
             <div class="info-box">
                 <strong>📌 Overview:</strong> Get a quick snapshot of your overall sales performance, including totals, averages, and key statistics.
             </div>
+
+            {% if training_results %}
+            <div style="margin-bottom: 2rem;">
+                <h2 style="color: #2c3e50; margin-bottom: 1.5rem;">🤖 ML Model Performance</h2>
+                <div class="stats-grid">
+                    <div class="stat-card" style="border-top: 4px solid #10b981;">
+                        <div class="stat-card-label">✅ R² Score (Accuracy)</div>
+                        <div class="stat-card-value">{{ "%.3f"|format(training_results.get('test_r2', 0)) }}</div>
+                        <div style="font-size: 0.85rem; color: #666; margin-top: 0.5rem;">Model explains {{ "%.1f"|format(training_results.get('test_r2', 0) * 100) }}% of variance</div>
+                    </div>
+                    <div class="stat-card" style="border-top: 4px solid #f59e0b;">
+                        <div class="stat-card-label">📊 MAE (Mean Error)</div>
+                        <div class="stat-card-value">${{ "%.2f"|format(training_results.get('test_mae', 0)) }}</div>
+                        <div style="font-size: 0.85rem; color: #666; margin-top: 0.5rem;">Average prediction error</div>
+                    </div>
+                    <div class="stat-card" style="border-top: 4px solid #3b82f6;">
+                        <div class="stat-card-label">📈 RMSE</div>
+                        <div class="stat-card-value">${{ "%.2f"|format(training_results.get('test_rmse', 0)) }}</div>
+                        <div style="font-size: 0.85rem; color: #666; margin-top: 0.5rem;">Root mean squared error</div>
+                    </div>
+                    <div class="stat-card" style="border-top: 4px solid #ec4899;">
+                        <div class="stat-card-label">📚 Samples</div>
+                        <div class="stat-card-value">{{ training_results.get('n_samples', 0) }}</div>
+                        <div style="font-size: 0.85rem; color: #666; margin-top: 0.5rem;">Training records used</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
 
             <h2 style="color: #2c3e50; margin-bottom: 1.5rem;">Overall Statistics</h2>
             <div class="stats-grid">

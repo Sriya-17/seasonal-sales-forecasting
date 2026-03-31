@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Prediction - Random Forest ML</title>
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">Sales Forecasting</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/upload">Upload Data</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/analysis">Analysis</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/sales-predictor">ML Predictor</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/logout">Logout</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h2 class="mb-0">
+                            <i class="fas fa-brain"></i> Random Forest Sales Predictor
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        <p class="lead">
+                            Train a machine learning model to predict future sales based on historical data.
+                            Upload your CSV file with Date, Product, Quantity, and Sales columns to get started,
+                            or use your previously uploaded data.
+                        </p>
+
+                        <!-- Model Status -->
+                        <div id="model-status" class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Checking model status...</strong>
+                        </div>
+
+                        <!-- Training Section -->
+                        <div class="row mt-4">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5><i class="fas fa-graduation-cap"></i> Train Model</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <form id="train-form" enctype="multipart/form-data">
+                                            <div class="mb-3">
+                                                <label for="train-file" class="form-label">
+                                                    Upload Training CSV (Optional)
+                                                </label>
+                                                <input type="file" class="form-control" id="train-file" name="file" accept=".csv">
+                                                <div class="form-text">
+                                                    CSV should contain: Date, Product, Quantity, Sales columns.
+                                                    If not provided, your previously uploaded data will be used.
+                                                </div>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary" id="train-btn">
+                                                <i class="fas fa-play"></i> Train Model
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Prediction Section -->
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5><i class="fas fa-chart-line"></i> Make Predictions</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <form id="predict-form" enctype="multipart/form-data">
+                                            <div class="mb-3">
+                                                <label for="predict-file" class="form-label">
+                                                    Upload Prediction CSV (Optional)
+                                                </label>
+                                                <input type="file" class="form-control" id="predict-file" name="file" accept=".csv">
+                                                <div class="form-text">
+                                                    CSV with Date, Product, Quantity columns (no Sales column needed).
+                                                    If not provided, predictions will be made on your uploaded data.
+                                                </div>
+                                            </div>
+                                            <button type="submit" class="btn btn-success" id="predict-btn" disabled>
+                                                <i class="fas fa-magic"></i> Predict Sales
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Training Results -->
+                        <div id="training-results" class="mt-4" style="display: none;">
+                            <div class="card">
+                                <div class="card-header bg-primary text-white">
+                                    <h5><i class="fas fa-chart-bar"></i> Training Results</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h6>Model Performance</h6>
+                                            <div id="metrics-display"></div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6>Feature Importance</h6>
+                                            <canvas id="feature-importance-chart" width="300" height="200"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Prediction Results -->
+                        <div id="prediction-results" class="mt-4" style="display: none;">
+                            <div class="card">
+                                <div class="card-header bg-success text-white">
+                                    <h5><i class="fas fa-table"></i> Prediction Results</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <canvas id="prediction-chart" width="400" height="200"></canvas>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h6>Summary Statistics</h6>
+                                            <div id="prediction-summary"></div>
+                                            <button class="btn btn-sm btn-outline-primary mt-2" onclick="downloadPredictions()">
+                                                <i class="fas fa-download"></i> Download CSV
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Future Predictions -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5><i class="fas fa-calendar-alt"></i> Future Sales Predictions</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <form id="future-form">
+                                            <div class="row">
+                                                <div class="col-md-3">
+                                                    <label for="future-days" class="form-label">Number of Days</label>
+                                                    <input type="number" class="form-control" id="future-days" value="30" min="1" max="365">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label for="product-select" class="form-label">Product</label>
+                                                    <select class="form-control" id="product-select">
+                                                        <option value="">Select Product</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label for="quantity-input" class="form-label">Quantity</label>
+                                                    <input type="number" class="form-control" id="quantity-input" value="10" min="1">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label">&nbsp;</label>
+                                                    <button type="submit" class="btn btn-info w-100" id="future-btn">
+                                                        <i class="fas fa-search"></i> Predict Future
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </form>
+
+                                        <div id="future-results" class="mt-3" style="display: none;">
+                                            <canvas id="future-chart" width="600" height="300"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Modal -->
+    <div class="modal fade" id="loadingModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-body text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2" id="loading-text">Processing...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let trainingResults = null;
+        let predictionResults = null;
+        let futurePredictions = null;
+
+        // Check model status on page load
+        $(document).ready(function() {
+            checkModelStatus();
+        });
+
+        // Check if model is trained
+        function checkModelStatus() {
+            $.get('/api/sales-model-status')
+                .done(function(data) {
+                    if (data.has_model && data.model_trained) {
+                        $('#model-status').removeClass('alert-info').addClass('alert-success');
+                        $('#model-status').html('<i class="fas fa-check-circle"></i> <strong>Model Ready!</strong> Your Random Forest model is trained and ready for predictions.');
+                        $('#predict-btn').prop('disabled', false);
+
+                        if (data.training_results) {
+                            trainingResults = data.training_results;
+                            displayTrainingResults();
+                        }
+                    } else {
+                        $('#model-status').removeClass('alert-info').addClass('alert-warning');
+                        $('#model-status').html('<i class="fas fa-exclamation-triangle"></i> <strong>No Model Found.</strong> Please train a model first.');
+                        $('#predict-btn').prop('disabled', true);
+                    }
+                })
+                .fail(function() {
+                    $('#model-status').removeClass('alert-info').addClass('alert-danger');
+                    $('#model-status').html('<i class="fas fa-times-circle"></i> <strong>Error:</strong> Could not check model status.');
+                });
+        }
+
+        // Train model form submission
+        $('#train-form').on('submit', function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(this);
+            $('#loadingModal').modal('show');
+            $('#loading-text').text('Training Random Forest model... This may take a few minutes.');
+
+            $.ajax({
+                url: '/api/train-sales-model',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    $('#loadingModal').modal('hide');
+                    trainingResults = data.results;
+                    displayTrainingResults();
+                    checkModelStatus();
+
+                    alert('Model trained successfully!');
+                },
+                error: function(xhr) {
+                    $('#loadingModal').modal('hide');
+                    alert('Training failed: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+
+        // Predict sales form submission
+        $('#predict-form').on('submit', function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(this);
+            $('#loadingModal').modal('show');
+            $('#loading-text').text('Making predictions...');
+
+            $.ajax({
+                url: '/api/predict-sales',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    $('#loadingModal').modal('hide');
+                    predictionResults = data.predictions;
+                    displayPredictionResults();
+
+                    alert(`Predictions generated for ${data.n_predictions} records!`);
+                },
+                error: function(xhr) {
+                    $('#loadingModal').modal('hide');
+                    alert('Prediction failed: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+
+        // Future predictions form submission
+        $('#future-form').on('submit', function(e) {
+            e.preventDefault();
+
+            const days = $('#future-days').val();
+            const product = $('#product-select').val();
+            const quantity = $('#quantity-input').val();
+
+            const requestData = {
+                dates: generateFutureDates(days),
+                product_info: {
+                    product: product,
+                    quantity: parseInt(quantity)
+                }
+            };
+
+            $('#loadingModal').modal('show');
+            $('#loading-text').text('Generating future predictions...');
+
+            $.ajax({
+                url: '/api/future-sales-prediction',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(requestData),
+                success: function(data) {
+                    $('#loadingModal').modal('hide');
+                    futurePredictions = data.predictions;
+                    displayFuturePredictions();
+
+                    alert(`Future predictions generated for ${days} days!`);
+                },
+                error: function(xhr) {
+                    $('#loadingModal').modal('hide');
+                    alert('Future prediction failed: ' + xhr.responseJSON.message);
+                }
+            });
+        });
+
+        // Display training results
+        function displayTrainingResults() {
+            if (!trainingResults) return;
+
+            $('#training-results').show();
+
+            const metricsHtml = `
+                <div class="row">
+                    <div class="col-6">
+                        <strong>Training R²:</strong> ${trainingResults.train_r2.toFixed(3)}<br>
+                        <strong>Training RMSE:</strong> $${trainingResults.train_rmse.toFixed(2)}<br>
+                        <strong>Training MAE:</strong> $${trainingResults.train_mae.toFixed(2)}
+                    </div>
+                    <div class="col-6">
+                        <strong>Testing R²:</strong> ${trainingResults.test_r2.toFixed(3)}<br>
+                        <strong>Testing RMSE:</strong> $${trainingResults.test_rmse.toFixed(2)}<br>
+                        <strong>Testing MAE:</strong> $${trainingResults.test_mae.toFixed(2)}
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted">
+                        Trained on ${trainingResults.n_samples} samples with ${trainingResults.n_features} features
+                    </small>
+                </div>
+            `;
+
+            $('#metrics-display').html(metricsHtml);
+
+            // Feature importance chart
+            const ctx = document.getElementById('feature-importance-chart').getContext('2d');
+            const topFeatures = Object.entries(trainingResults.feature_importance)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 10);
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: topFeatures.map(([feature, _]) => feature),
+                    datasets: [{
+                        label: 'Importance',
+                        data: topFeatures.map(([_, importance]) => importance),
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // Display prediction results
+        function displayPredictionResults() {
+            if (!predictionResults) return;
+
+            $('#prediction-results').show();
+
+            // Create chart
+            const ctx = document.getElementById('prediction-chart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: predictionResults.map((_, i) => `Record ${i + 1}`),
+                    datasets: [{
+                        label: 'Predicted Sales',
+                        data: predictionResults,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Sales Predictions'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Sales ($)'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Summary statistics
+            const stats = calculateStats(predictionResults);
+            const summaryHtml = `
+                <strong>Total Predictions:</strong> ${predictionResults.length}<br>
+                <strong>Mean Sales:</strong> $${stats.mean.toFixed(2)}<br>
+                <strong>Min Sales:</strong> $${stats.min.toFixed(2)}<br>
+                <strong>Max Sales:</strong> $${stats.max.toFixed(2)}<br>
+                <strong>Std Deviation:</strong> $${stats.std.toFixed(2)}
+            `;
+
+            $('#prediction-summary').html(summaryHtml);
+        }
+
+        // Display future predictions
+        function displayFuturePredictions() {
+            if (!futurePredictions) return;
+
+            $('#future-results').show();
+
+            const ctx = document.getElementById('future-chart').getContext('2d');
+            const dates = futurePredictions.map(p => new Date(p.date).toLocaleDateString());
+            const sales = futurePredictions.map(p => p.predicted_sales);
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Future Sales Predictions',
+                        data: sales,
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Future Sales Forecast'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Predicted Sales ($)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Generate future dates
+        function generateFutureDates(days) {
+            const dates = [];
+            const today = new Date();
+
+            for (let i = 1; i <= days; i++) {
+                const futureDate = new Date(today);
+                futureDate.setDate(today.getDate() + i);
+                dates.push(futureDate.toISOString().split('T')[0]);
+            }
+
+            return dates;
+        }
+
+        // Calculate basic statistics
+        function calculateStats(data) {
+            const sum = data.reduce((a, b) => a + b, 0);
+            const mean = sum / data.length;
+            const min = Math.min(...data);
+            const max = Math.max(...data);
+            const variance = data.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / data.length;
+            const std = Math.sqrt(variance);
+
+            return { mean, min, max, std };
+        }
+
+        // Download predictions as CSV
+        function downloadPredictions() {
+            if (!predictionResults) {
+                alert('No predictions available to download');
+                return;
+            }
+
+            let csv = 'Predicted_Sales\n';
+            predictionResults.forEach(pred => {
+                csv += `${pred.toFixed(2)}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sales_predictions.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

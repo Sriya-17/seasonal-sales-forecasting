@@ -86,6 +86,29 @@
         .legend-upper { background: #f87171; opacity: 0.3; }
         .legend-lower { background: #f87171; opacity: 0.3; }
 
+        .help-section {
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .help-section h6 {
+            color: #667eea;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .help-section ul {
+            margin: 0;
+            padding-left: 1.2rem;
+        }
+
+        .help-section li {
+            margin-bottom: 0.25rem;
+        }
+
         .stats-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -277,6 +300,7 @@
         <div class="controls">
             <button class="btn btn-primary" onclick="generateForecast()">🚀 Generate Forecast</button>
             <button class="btn btn-secondary" onclick="downloadCSV()">⬇️ Download as CSV</button>
+            <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#helpModal">❓ Help</button>
             <button class="btn btn-secondary" onclick="location.reload()">🔄 Refresh</button>
             <span id="status"></span>
         </div>
@@ -358,7 +382,7 @@
                 statusEl.innerHTML = 'Generating forecast' + spinner;
 
                 // Fetch data from backend
-                const response = await fetch('/api/get-forecast-data');
+                const response = await fetch('/api/forecast-data');
                 if (!response.ok) {
                     throw new Error(`Server error: ${response.statusText}`);
                 }
@@ -593,5 +617,56 @@
             document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
         });
     </script>
+
+    <!-- Help Modal -->
+    <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="helpModalLabel">How to Use the Interactive Forecast</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="help-section">
+                        <h6><i class="fas fa-chart-line"></i> Understanding the Chart</h6>
+                        <ul>
+                            <li><strong>Blue Line:</strong> Your historical sales data</li>
+                            <li><strong>Red Line:</strong> AI-generated forecast for the next 12 months</li>
+                            <li><strong>Light Red Area:</strong> Confidence interval (80% prediction range)</li>
+                        </ul>
+                    </div>
+                    <div class="help-section">
+                        <h6><i class="fas fa-brain"></i> How the AI Works</h6>
+                        <p>The system uses a pre-trained Random Forest machine learning model that has been trained on extensive sales data. When you upload your store's historical sales data, the AI analyzes your patterns and predicts future sales for the next 12 months based on learned trends, seasonality, and market patterns.</p>
+                        <p><strong>Key Features:</strong></p>
+                        <ul>
+                            <li>Pre-trained on 2,000+ sales transactions across multiple products</li>
+                            <li>Considers seasonal patterns, product categories, and quantity trends</li>
+                            <li>Provides confidence intervals for prediction uncertainty</li>
+                            <li>Adapts predictions based on your specific historical data</li>
+                        </ul>
+                    </div>
+                    <div class="help-section">
+                        <h6><i class="fas fa-lightbulb"></i> Tips for Better Forecasts</h6>
+                        <ul>
+                            <li>Upload at least 6-12 months of historical data for accurate predictions</li>
+                            <li>Include data from different seasons for better seasonal pattern recognition</li>
+                            <li>Ensure your data has consistent date formats and no missing values</li>
+                        </ul>
+                    </div>
+                    <div class="help-section">
+                        <h6><i class="fas fa-download"></i> Export Options</h6>
+                        <p>Use the "Download CSV" button to export the forecast data for use in Excel, Google Sheets, or other analysis tools.</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Bootstrap JS for modal -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
