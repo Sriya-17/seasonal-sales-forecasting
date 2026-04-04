@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Sales Data - Sales Forecasting System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .upload-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        .upload-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+
+        .upload-header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .upload-header p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+            margin-bottom: 0;
+        }
+
+        .upload-content {
+            padding: 3rem 2rem;
+        }
+
+        .upload-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .step-card {
+            text-align: center;
+            padding: 2rem;
+            border-radius: 12px;
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            transition: all 0.3s ease;
+        }
+
+        .step-card:hover {
+            transform: translateY(-5px);
+            border-color: #667eea;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+        }
+
+        .step-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+
+        .step-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+
+        .step-description {
+            font-size: 0.95rem;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .upload-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            border: 2px dashed #667eea;
+        }
+
+        .upload-section h3 {
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 1.5rem;
+        }
+
+        .upload-area:hover {
+            background: #f0f4ff;
+            border-color: #764ba2;
+        }
+
+        .upload-area.dragover {
+            background: #e8f0ff;
+            border-color: #764ba2;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+
+        .upload-text h4 {
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .upload-text p {
+            color: #666;
+            font-size: 0.95rem;
+            margin-bottom: 0;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .file-info {
+            background: #e8f5e9;
+            border-left: 4px solid #10b981;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            display: none;
+        }
+
+        .file-info.show {
+            display: block;
+        }
+
+        .file-info-content {
+            color: #047857;
+            font-size: 0.95rem;
+        }
+
+        .file-info-name {
+            font-weight: 600;
+            color: #065f46;
+            margin-bottom: 0.3rem;
+        }
+
+        .btn-upload {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 1rem 3rem;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            font-size: 1.05rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .btn-upload:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-upload:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .file-requirements {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+
+        .file-requirements h4 {
+            color: #856404;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .file-requirements ul {
+            margin-bottom: 0;
+            padding-left: 1.5rem;
+            color: #856404;
+        }
+
+        .file-requirements li {
+            margin-bottom: 0.5rem;
+        }
+
+        .example-files {
+            background: #f0f7ff;
+            border-left: 4px solid #2196F3;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-top: 2rem;
+        }
+
+        .example-files h4 {
+            color: #1976D2;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .example-files p {
+            color: #1565c0;
+            font-size: 0.95rem;
+        }
+
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            margin: 2rem 0;
+        }
+
+        .loading-spinner.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .upload-features {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-top: 2rem;
+            border: 1px solid #e0e0e0;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .feature-item {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .feature-icon {
+            font-size: 1.5rem;
+            color: #667eea;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .feature-content h5 {
+            color: #2c3e50;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+        }
+
+        .feature-content p {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 0;
+        }
+
+        @media (max-width: 768px) {
+            .upload-header h1 {
+                font-size: 1.8rem;
+            }
+
+            .upload-content {
+                padding: 1.5rem 1rem;
+            }
+
+            .upload-area {
+                padding: 2rem 1rem;
+            }
+
+            .upload-steps {
+                grid-template-columns: 1fr;
+            }
+
+            .btn-upload {
+                padding: 0.8rem 1.5rem;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📊 Sales Forecasting Hub</h1>
+        <ul class="nav-links">
+            <li><a href="/dashboard">Dashboard</a></li>
+            <li><a href="/upload" class="active">Upload</a></li>
+            {% if data_uploaded %}
+            <li><a href="/analysis">Analysis</a></li>
+            <li><a href="/predictions">Predictions</a></li>
+            <li><a href="/recommendation">Recommendations</a></li>
+            {% endif %}
+            <li><a href="/logout">Logout</a></li>
+        </ul>
+    </header>
+
+    <div class="upload-container">
+        <div class="upload-header">
+            <h1>📤 Upload Sales Data</h1>
+            <p>Get instant analysis, predictions, and recommendations automatically</p>
+        </div>
+
+        <div class="upload-content">
+            <!-- Process Steps -->
+            <div class="upload-steps">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <div class="step-title">📁 Upload Data</div>
+                    <div class="step-description">Choose your CSV file with sales data</div>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <div class="step-title">⚙️ Auto Analysis</div>
+                    <div class="step-description">System analyzes patterns & trends</div>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <div class="step-title">🤖 ML Training</div>
+                    <div class="step-description">Random Forest model learns patterns</div>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">4</div>
+                    <div class="step-title">🔮 Get Predictions</div>
+                    <div class="step-description">365-day sales forecast with insights</div>
+                </div>
+            </div>
+
+            <!-- File Requirements -->
+            <div class="file-requirements">
+                <h4>📋 File Requirements</h4>
+                <ul>
+                    <li><strong>Format:</strong> CSV (Comma-Separated Values)</li>
+                    <li><strong>Required Columns:</strong> Date and Sales (or Weekly_Sales)</li>
+                    <li><strong>Date Format:</strong> YYYY-MM-DD</li>
+                    <li><strong>File Size:</strong> Up to 50MB</li>
+                    <li><strong>Minimum Records:</strong> At least 30 days of data recommended</li>
+                </ul>
+            </div>
+
+            <!-- Upload Area -->
+            <div class="upload-section">
+                <h3>🎯 Upload Your Sales Data</h3>
+                
+                <div class="upload-area" id="uploadArea" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <div class="upload-text">
+                        <h4>Drag & Drop CSV File Here</h4>
+                        <p>or click to browse your computer</p>
+                    </div>
+                </div>
+
+                <input type="file" id="fileInput" accept=".csv" onchange="handleFileSelect(event)">
+
+                <!-- File Info Display -->
+                <div class="file-info" id="fileInfo">
+                    <div class="file-info-content">
+                        <div class="file-info-name">📄 <span id="fileName">filename.csv</span></div>
+                        <div id="fileSize"></div>
+                    </div>
+                </div>
+
+                <!-- Upload Button -->
+                <button type="button" class="btn-upload" id="uploadBtn" onclick="uploadFile()" disabled>
+                    📤 Upload & Analyze
+                </button>
+
+                <!-- Loading Spinner -->
+                <div class="loading-spinner" id="loadingSpinner">
+                    <div class="spinner"></div>
+                    <p><strong>Processing...</strong> Analyzing data and training model</p>
+                </div>
+            </div>
+
+            <!-- What Happens After Upload -->
+            <div class="upload-features">
+                <h3>✨ What You'll Get</h3>
+                <div class="features-grid">
+                    <div class="feature-item">
+                        <div class="feature-icon">📊</div>
+                        <div class="feature-content">
+                            <h5>Data Analysis</h5>
+                            <p>Comprehensive EDA with trends and patterns</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">🔮</div>
+                        <div class="feature-content">
+                            <h5>365-Day Forecast</h5>
+                            <p>ML-powered sales predictions with accuracy</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">💡</div>
+                        <div class="feature-content">
+                            <h5>Smart Recommendations</h5>
+                            <p>AI-generated insights for your business</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">📈</div>
+                        <div class="feature-content">
+                            <h5>Performance Metrics</h5>
+                            <p>R² Score, MAE, RMSE and more</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Example Files Note -->
+            <div class="example-files">
+                <h4>📝 Need Sample Data?</h4>
+                <p>Your CSV should have columns like: <code>Date, Store, Weekly_Sales</code> or <code>Date, Sales</code>
+                <br>Example: <code>2020-01-01, Store_5, 34558.52</code></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const fileInfo = document.getElementById('fileInfo');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        let selectedFile = null;
+
+        // Click to select file
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        // Handle file selection
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectFile(file);
+            }
+        }
+
+        // Handle drag over
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            uploadArea.classList.add('dragover');
+        }
+
+        // Handle drag leave
+        function handleDragLeave(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            uploadArea.classList.remove('dragover');
+        }
+
+        // Handle drop
+        function handleDrop(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            uploadArea.classList.remove('dragover');
+            
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.name.endsWith('.csv') || file.type === 'text/csv') {
+                    selectFile(file);
+                } else {
+                    alert('❌ Please drop a CSV file');
+                }
+            }
+        }
+
+        // Select file
+        function selectFile(file) {
+            selectedFile = file;
+            document.getElementById('fileName').textContent = file.name;
+            const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+            document.getElementById('fileSize').textContent = `Size: ${sizeMB} MB`;
+            fileInfo.classList.add('show');
+            uploadBtn.disabled = false;
+            uploadBtn.style.opacity = '1';
+            uploadBtn.style.cursor = 'pointer';
+        }
+
+        // Upload file
+        function uploadFile() {
+            if (!selectedFile) {
+                alert('Please select a CSV file first');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            loadingSpinner.classList.add('show');
+            uploadBtn.disabled = true;
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                loadingSpinner.classList.remove('show');
+                if (response.ok) {
+                    // Redirect to predictions page after successful upload
+                    window.location.href = '/predictions';
+                } else {
+                    alert('❌ Upload failed. Please try again.');
+                    uploadBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                loadingSpinner.classList.remove('show');
+                console.error('Error:', error);
+                alert('❌ Error uploading file: ' + error.message);
+                uploadBtn.disabled = false;
+            });
+        }
+    </script>
+
+    <footer>
+        <p>&copy; 2024 <strong>Seasonal Sales Forecasting System</strong> - Smart Analytics & Predictions | All Rights Reserved</p>
+    </footer>
+</body>
+</html>

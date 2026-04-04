@@ -31,12 +31,44 @@ from error_handlers import (
     validate_csv_file, validate_data_available, ErrorRecoveryStrategy, DatabaseOperation,
     format_error_response
 )
-from io import StringIO
+from io import StringIO, BytesIO
+import json
+import uuid
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+# from reportlab.lib.pagesizes import letter, A4
+# from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+# from reportlab.lib.units import inch
+# from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+# from reportlab.lib import colors
+# from openpyxl import Workbook
+# from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+
+def convert_to_json_serializable(obj):
+    """Convert numpy/pandas data types to JSON-serializable Python types"""
+    if isinstance(obj, dict):
+        return {key: convert_to_json_serializable(value) for key, value in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_to_json_serializable(item) for item in obj]
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif pd.isna(obj):
+        return None
+    else:
+        return obj
 
 
 def generate_future_predictions(df, model_path=None):
-    """Generate predictions for next 365 days using Random Forest model with store info"""
+    """Generate predictions for next 365 days using Random Forest model with enhanced insight columns"""
     try:
+        app_logger.info(f"[PREDICT] Starting prediction generation with {len(df)} records")
+        
         # Extract store information from original data
         store_list = []
         store_name = "All Stores"
@@ -52,6 +84,7 @@ def generate_future_predictions(df, model_path=None):
             # Aggregate sales by date for time series forecasting
             df_simple = df.groupby('Date')['Weekly_Sales'].sum().reset_index()
             df_simple = df_simple.rename(columns={'Weekly_Sales': 'Sales'})
+            app_logger.info(f"[PREDICT] Found Weekly_Sales column, aggregated to {len(df_simple)} records")
         else:
             # Try to map common column names
             date_col = None
@@ -68,48 +101,267 @@ def generate_future_predictions(df, model_path=None):
                 # Aggregate if there are multiple sales per date
                 if df_simple['Date'].duplicated().any():
                     df_simple = df_simple.groupby('Date')['Sales'].sum().reset_index()
+                app_logger.info(f"[PREDICT] Found Date/Sales columns: {date_col}/{sales_col}, {len(df_simple)} records")
             else:
-                raise ValueError("Dataset must contain Date and Sales columns")
+                raise ValueError(f"Dataset must contain Date and Sales columns. Found: {df.columns.tolist()}")
 
-        # Clean and prepare data
-        cleaned_df = clean_data(df_simple)
-        engineered_df = feature_engineering(cleaned_df)
-
-        # Get the last date for future predictions
-        last_date = pd.to_datetime(cleaned_df['Date'].max())
-
-        # Train the model
-        trained_model = train_model(engineered_df)
+        # Calculate historical statistics for context
+        df_simple['Date'] = pd.to_datetime(df_simple['Date'])
+        df_simple = df_simple.sort_values('Date')
+        
+        hist_mean = df_simple['Sales'].mean()
+        hist_median = df_simple['Sales'].median()
+        hist_std = df_simple['Sales'].std()
+        hist_min = df_simple['Sales'].min()
+        hist_max = df_simple['Sales'].max()
+        hist_q75 = df_simple['Sales'].quantile(0.75)
+        hist_q25 = df_simple['Sales'].quantile(0.25)
+        
+        app_logger.info(f"[PREDICT] Historical stats: mean={hist_mean:.0f}, min={hist_min:.0f}, max={hist_max:.0f}")
+        
+        # Calculate seasonal pattern per month/day from historical data
+        df_simple['Month'] = df_simple['Date'].dt.month
+        df_simple['DayOfYear'] = df_simple['Date'].dt.dayofyear
+        monthly_avg = df_simple.groupby('Month')['Sales'].mean().to_dict()
+        
+        # ✅ Save the date and last date BEFORE cleaning (clean_data removes Date column)
+        last_date = pd.to_datetime(df_simple['Date'].max())
+        
+        # ✅ Train model with raw data (train_model handles cleaning internally)
+        app_logger.info(f"[PREDICT] Training model with raw data shape {df_simple.shape}")
+        trained_model = train_model(df_simple)
+        app_logger.info(f"[PREDICT] Model training returned: {type(trained_model)}, keys: {trained_model.keys() if isinstance(trained_model, dict) else 'N/A'}")
 
         # Generate future dates
-        future_dates = generate_future_dates(365, last_date)
+        future_dates_df = generate_future_dates(365, last_date)  # Returns DataFrame with Date column
+        app_logger.info(f"[PREDICT] Generated future dates dataframe: shape {future_dates_df.shape}, columns {future_dates_df.columns.tolist()}")
+        future_dates_list = pd.to_datetime(future_dates_df['Date']).tolist()
+        app_logger.info(f"[PREDICT] Extracted {len(future_dates_list)} future dates as list")
 
-        # Make predictions
-        predictions_df = predict_future(trained_model, future_dates, last_date)
+        # Create predictions using the trained model directly (avoid predict_future bugs)
+        try:
+            # Extract the actual model from the dict returned by train_model
+            actual_model = trained_model['model'] if isinstance(trained_model, dict) else trained_model
+            expected_features = trained_model['feature_columns'] if isinstance(trained_model, dict) and 'feature_columns' in trained_model else None
+            
+            app_logger.info(f"[PREDICT] Expected features from model: {expected_features}")
+            
+            # Create features for future dates - matching the exact features used in training
+            future_data = []
+            for date in future_dates_list:
+                # Start with temporal features
+                row = {
+                    'year': date.year,
+                    'month': date.month,
+                    'day': date.day,
+                    'week': date.isocalendar()[1],
+                    'day_of_week': date.weekday(),
+                    'quarter': (date.month - 1) // 3 + 1,
+                    'day_of_year': date.timetuple().tm_yday,
+                }
+                
+                # Add other features that might have been in training data
+                # Use reasonable defaults for these
+                row.update({
+                    'Sales': hist_mean,  # Use average as baseline
+                    'Store': 1,
+                    'product_id': 1,
+                    'category': 1,
+                    'season': ((date.month - 1) // 3),
+                    'holiday': 0,
+                    'promotion': 0,
+                    'price': hist_mean * 0.8,
+                    'inventory_level': 100,
+                    'temperature': 20,
+                    'rainfall': 0,
+                    'quantity_sold': 1,
+                })
+                
+                future_data.append(row)
+            
+            future_df = pd.DataFrame(future_data)
+            app_logger.info(f"[PREDICT] Created future dataframe with shape {future_df.shape}")
+            app_logger.info(f"[PREDICT] Future dataframe columns: {future_df.columns.tolist()}")
+            
+            # Use only the features that the model was trained with
+            if expected_features:
+                # Filter to only the features the model knows about
+                feature_cols = [col for col in expected_features if col in future_df.columns]
+                app_logger.info(f"[PREDICT] Using {len(feature_cols)} features for prediction: {feature_cols}")
+            else:
+                # Fallback: use all numeric columns except Date-related ones
+                feature_cols = [col for col in future_df.columns if col not in ['Date', 'day_name', 'month_name']]
+                app_logger.info(f"[PREDICT] Using fallback feature list: {feature_cols}")
+            
+            # Make predictions
+            X_future = future_df[feature_cols]
+            app_logger.info(f"[PREDICT] X_future shape: {X_future.shape}, dtypes: {X_future.dtypes.to_dict()}")
+            
+            predictions = actual_model.predict(X_future)
+            app_logger.info(f"[PREDICT] predictions shape: {predictions.shape}")
+            
+            # Create predictions dataframe
+            predictions_df = pd.DataFrame({
+                'Date': future_dates_list,
+                'Predicted_Sales': predictions
+            })
+            
+            app_logger.info(f"[PREDICT] Generated {len(predictions_df)} predictions successfully")
+            
+        except Exception as pred_error:
+            app_logger.error(f"[PREDICT] Direct prediction failed: {str(pred_error)}", exc_info=True)
+            raise pred_error
 
-        # Convert to the format expected by the template
+        # Convert to the format expected by the template with enhanced columns
         predictions = []
+        prev_pred = hist_mean  # For trend calculation
+        
         for idx, row in predictions_df.iterrows():
             pred_date = row['Date']
-
+            pred_sales = float(row['Predicted_Sales'])
+            
+            # Calculate useful metrics for user understanding
+            month_num = pred_date.month
+            week_num = pred_date.isocalendar()[1]
+            month_name = pred_date.strftime('%B')
+            
+            # Compare to historical average
+            percent_vs_average = ((pred_sales - hist_mean) / hist_mean * 100) if hist_mean > 0 else 0
+            percent_vs_median = ((pred_sales - hist_median) / hist_median * 100) if hist_median > 0 else 0
+            
+            # Seasonal context
+            monthly_hist_avg = monthly_avg.get(month_num, hist_mean)
+            percent_vs_monthly = ((pred_sales - monthly_hist_avg) / monthly_hist_avg * 100) if monthly_hist_avg > 0 else 0
+            
+            # Trend direction (comparing to previous prediction)
+            trend_pct = ((pred_sales - prev_pred) / prev_pred * 100) if prev_pred > 0 else 0
+            trend_direction = "📈 Up" if trend_pct > 2 else "📉 Down" if trend_pct < -2 else "→ Stable"
+            
+            # Risk assessment based on confidence interval
+            confidence_lower = float(row['Predicted_Sales'] * 0.85)
+            confidence_upper = float(row['Predicted_Sales'] * 1.15)
+            confidence_range = confidence_upper - confidence_lower
+            confidence_pct = ((confidence_range / pred_sales) * 100) if pred_sales > 0 else 0
+            
+            # Risk level
+            if confidence_pct > 30:
+                risk_level = "⚠️ High"
+                risk_color = "danger"
+            elif confidence_pct > 20:
+                risk_level = "🟡 Medium"
+                risk_color = "warning"
+            else:
+                risk_level = "✅ Low"
+                risk_color = "success"
+            
+            # Performance indicator vs historical
+            if pred_sales > hist_q75:
+                performance = "🌟 Excellent"
+                perf_color = "success"
+            elif pred_sales > hist_median:
+                performance = "👍 Good"
+                perf_color = "info"
+            else:
+                performance = "⚠️ Below Avg"
+                perf_color = "warning"
+            
+            # Seasonal indicator
+            if percent_vs_monthly > 10:
+                seasonal_note = f"Peak Season +{percent_vs_monthly:.1f}%"
+            elif percent_vs_monthly < -10:
+                seasonal_note = f"Low Season {percent_vs_monthly:.1f}%"
+            else:
+                seasonal_note = "Normal Seasonal"
+            
             predictions.append({
+                # Basic info
                 'date': pred_date.strftime('%Y-%m-%d'),
-                'predicted_sales': float(row['Predicted_Sales']),
+                'day_name': pred_date.strftime('%A'),
+                'predicted_sales': float(pred_sales),
                 'month': pred_date.strftime('%B %Y'),
+                'week': f"Week {int(week_num)}",
                 'store_name': store_name,
-                'stores': list(store_list) if len(store_list) > 0 else [],
-                'confidence_lower': float(row['Predicted_Sales'] * 0.9),  # Simplified confidence
-                'confidence_upper': float(row['Predicted_Sales'] * 1.1)
+                'stores': [int(x) for x in store_list] if len(store_list) > 0 else [],
+                
+                # Confidence & Risk
+                'confidence_lower': float(confidence_lower),
+                'confidence_upper': float(confidence_upper),
+                'confidence_range': float(confidence_range),
+                'risk_level': risk_level,
+                'risk_color': risk_color,
+                'risk_percentage': f"{confidence_pct:.1f}%",
+                
+                # Comparisons
+                'percent_vs_average': f"{percent_vs_average:+.1f}%",
+                'percent_vs_median': f"{percent_vs_median:+.1f}%",
+                'percent_vs_monthly': f"{percent_vs_monthly:+.1f}%",
+                'historical_average': float(hist_mean),
+                'monthly_average': float(monthly_hist_avg),
+                
+                # Trends
+                'trend_direction': trend_direction,
+                'trend_percentage': f"{trend_pct:+.1f}%",
+                'performance': performance,
+                'performance_color': perf_color,
+                'seasonal_note': seasonal_note,
+                
+                # Additional context
+                'vs_max': f"{((pred_sales/hist_max)*100):.1f}% of max",
+                'vs_min': f"{((pred_sales/hist_min)*100):.1f}% of min",
+            })
+            
+            prev_pred = pred_sales
+
+        # ✅ GENERATE MONTHLY PREDICTIONS
+        monthly_predictions = []
+        predictions_df['Month'] = pd.to_datetime(predictions_df['Date']).dt.strftime('%B %Y')
+        monthly_group = predictions_df.groupby('Month')['Predicted_Sales'].agg(['sum', 'mean', 'min', 'max', 'count']).reset_index()
+        
+        for idx, month_row in monthly_group.iterrows():
+            month_sales = month_row['sum']
+            month_avg = month_row['mean']
+            month_min = month_row['min']
+            month_max = month_row['max']
+            days_in_month = month_row['count']
+            
+            # Compare to historical
+            percent_vs_avg = ((month_sales - (hist_mean * days_in_month)) / (hist_mean * days_in_month) * 100) if hist_mean > 0 else 0
+            
+            # Risk based on variance
+            variance = month_max - month_min
+            confidence_range = variance
+            confidence_pct = ((confidence_range / month_sales) * 100) if month_sales > 0 else 0
+            
+            if confidence_pct > 30:
+                risk_level = "⚠️ High"
+                risk_color = "danger"
+            elif confidence_pct > 20:
+                risk_level = "🟡 Medium"
+                risk_color = "warning"
+            else:
+                risk_level = "✅ Low"
+                risk_color = "success"
+            
+            monthly_predictions.append({
+                'month': month_row['Month'],
+                'total_sales': float(month_sales),
+                'avg_daily_sales': float(month_avg),
+                'min_sales': float(month_min),
+                'max_sales': float(month_max),
+                'days_in_month': int(days_in_month),
+                'percent_vs_avg': f"{percent_vs_avg:+.1f}%",
+                'risk_level': risk_level,
+                'risk_color': risk_color,
             })
 
         # Get insights
         insights = get_insights(predictions_df)
 
-        return predictions, trained_model, insights
+        return predictions, trained_model, insights, monthly_predictions
 
     except Exception as e:
         app_logger.error(f"Error generating future predictions: {str(e)}")
-        return [], None, {}
+        return [], None, {}, []
 
 
 app = Flask(__name__)
@@ -459,6 +711,8 @@ def dashboard():
             flash('Upload a dataset to enable analysis, forecasting, and recommendations.', 'info')
 
         stats = {}
+        ml_predictions = session.get('future_predictions', [])
+        
         if df is not None and not df.empty and upload_completed:
             stats = get_data_stats(df)
             stats['data_source'] = f"Data loaded from {data_source.title()} Dataset"
@@ -471,7 +725,7 @@ def dashboard():
             else:
                 app_logger.warning(f"Dashboard accessed but no data available for user {user_info}")
         
-        return render_template('dashboard_improved.html', 
+        return render_template('dashboard_redesigned.html', 
                              stats=stats, 
                              stores=store_summary.to_dict('records') if store_summary is not None else [], 
                              data_source=data_source, 
@@ -479,13 +733,15 @@ def dashboard():
                              data_uploaded=upload_completed,
                              training_results=session.get('training_results', {}),
                              insights=session.get('insights', {}),
-                             recommendations=session.get('insights', {}).get('recommendations', []))
+                             recommendations=session.get('insights', {}).get('recommendations', []),
+                             ml_predictions=ml_predictions,  # ✅ ADD PREDICTIONS TO DASHBOARD
+                             model_trained=session.get('model_trained', False))
     except Exception as e:
         # don't send user away from dashboard; show them the page with an error message
         app_logger.error(f"Error loading dashboard: {str(e)}", exc_info=True)
         flash('Error loading dashboard. Please try uploading data again.', 'error')
         # render dashboard with empty stats so template still loads
-        return render_template('dashboard_improved.html',
+        return render_template('dashboard_redesigned.html',
                              stats={},
                              stores=[],
                              data_source=data_source,
@@ -493,7 +749,9 @@ def dashboard():
                              data_uploaded=upload_completed,
                              training_results=session.get('training_results', {}),
                              insights=session.get('insights', {}),
-                             recommendations=session.get('insights', {}).get('recommendations', []))
+                             recommendations=session.get('insights', {}).get('recommendations', []),
+                             ml_predictions=session.get('future_predictions', []),  # ✅ ADD PREDICTIONS
+                             model_trained=session.get('model_trained', False))
 
 
 @app.route('/upload', methods=['GET', 'POST'])
@@ -584,7 +842,8 @@ def upload():
                         # Step 1: Perform EDA (Exploratory Data Analysis)
                         try:
                             eda_results = perform_eda(df)
-                            session['eda_results'] = eda_results
+                            session['eda_results'] = convert_to_json_serializable(eda_results)
+                            session.modified = True
                             app_logger.info(f"EDA completed for user {user_id}")
                         except Exception as eda_error:
                             app_logger.warning(f"EDA failed: {str(eda_error)}")
@@ -593,7 +852,8 @@ def upload():
                         # Step 2: Get monthly trends
                         try:
                             monthly_trends = get_monthly_trends(df)
-                            session['monthly_trends'] = monthly_trends
+                            session['monthly_trends'] = convert_to_json_serializable(monthly_trends)
+                            session.modified = True
                         except Exception as trend_error:
                             app_logger.warning(f"Monthly trends failed: {str(trend_error)}")
                             session['monthly_trends'] = {}
@@ -601,7 +861,8 @@ def upload():
                         # Step 3: Get seasonal patterns
                         try:
                             seasonal_patterns = get_seasonal_patterns(df)
-                            session['seasonal_patterns'] = seasonal_patterns
+                            session['seasonal_patterns'] = convert_to_json_serializable(seasonal_patterns)
+                            session.modified = True
                         except Exception as seasonal_error:
                             app_logger.warning(f"Seasonal patterns failed: {str(seasonal_error)}")
                             session['seasonal_patterns'] = {}
@@ -609,7 +870,8 @@ def upload():
                         # Step 4: Get peak periods
                         try:
                             peak_periods = get_peak_and_low_periods(df)
-                            session['peak_periods'] = peak_periods
+                            session['peak_periods'] = convert_to_json_serializable(peak_periods)
+                            session.modified = True
                         except Exception as peak_error:
                             app_logger.warning(f"Peak periods failed: {str(peak_error)}")
                             session['peak_periods'] = {}
@@ -618,7 +880,8 @@ def upload():
                         try:
                             if 'Store' in df.columns:
                                 store_analysis = get_store_analysis(df)
-                                session['store_analysis'] = store_analysis
+                                session['store_analysis'] = convert_to_json_serializable(store_analysis)
+                                session.modified = True
                         except Exception as store_error:
                             app_logger.warning(f"Store analysis failed: {str(store_error)}")
                             session['store_analysis'] = {}
@@ -631,23 +894,39 @@ def upload():
                         
                         if training_result['success']:
                             # Store training results in session
-                            session['training_results'] = training_result['results']
+                            session['training_results'] = convert_to_json_serializable(training_result['results'])
                             session['model_trained'] = True
                             session['model_path'] = model_save_path
+                            # ⚠️ CRITICAL: Mark session as modified to ensure it persists
+                            session.modified = True
+                            app_logger.info(f"Model training success for {user_id}")
 
                             # Step 7: Generate predictions for next 365 days
-                            future_predictions, trained_model, insights = generate_future_predictions(df)
-                            session['future_predictions'] = future_predictions
-                            session['trained_model'] = trained_model
-                            session['insights'] = insights
+                            try:
+                                future_predictions, trained_model, insights, monthly_predictions = generate_future_predictions(df)
+                                if future_predictions and len(future_predictions) > 0:
+                                    # ⚠️ DON'T store predictions in session - too large for cookie!
+                                    # Only store a flag that predictions were generated
+                                    session['insights'] = convert_to_json_serializable(insights)
+                                    session['predictions_available'] = True
+                                    
+                                    # ⚠️ CRITICAL: Mark session as modified to ensure it persists
+                                    session.modified = True
 
-                            app_logger.info(f"✅ Complete analysis done! Model trained and {len(future_predictions)} predictions generated for user {user_id}")
+                                    app_logger.info(f"✅ Complete analysis done! Model trained and {len(future_predictions)} predictions generated for user {user_id}")
+                                else:
+                                    app_logger.error(f"Prediction generation returned empty predictions for {user_id}")
+                                    flash('⚠️ Warning: Model trained but prediction generation returned no results. Please check your data.', 'warning')
+                            except Exception as pred_error:
+                                app_logger.error(f"Prediction generation failed for {user_id}: {str(pred_error)}", exc_info=True)
+                                flash(f'⚠️ Warning: Model trained but prediction generation failed: {str(pred_error)}', 'warning')
                         else:
-                            app_logger.warning(f"Model training failed for user {user_id}: {training_result.get('error', 'Unknown error')}")
+                            app_logger.error(f"Model training failed for user {user_id}: {training_result.get('error', 'Unknown error')}")
+                            flash(f'⚠️ File uploaded but model training failed: {training_result.get("error", "Unknown error")}', 'error')
 
                     except Exception as analysis_error:
-                        app_logger.error(f"Error during automatic analysis: {str(analysis_error)}")
-                        # Continue with upload even if analysis fails
+                        app_logger.error(f"Error during automatic analysis: {str(analysis_error)}", exc_info=True)
+                        flash(f'⚠️ Error during analysis: {str(analysis_error)}', 'error')
                     
                     app_logger.info(f"User {user_id} uploaded file '{filename}' with {len(df)} records")
                     flash(f'✅ File uploaded and ML model trained successfully! {message}', 'success')
@@ -1000,7 +1279,7 @@ def api_forecast_data():
     forecast_items = session.get('future_predictions') or []
     if not forecast_items:
         try:
-            forecast_items, _, _ = generate_future_predictions(df)
+            forecast_items, _, _, _ = generate_future_predictions(df)
         except Exception as e:
             app_logger.error(f"Unable to generate forecast data: {e}", exc_info=True)
             raise DataLoadError(f"Unable to generate forecast data: {e}")
@@ -1416,42 +1695,76 @@ def unified_analysis_api():
 @login_required
 def predictions():
     """Display ML predictions page with ALL automatic analysis results"""
-    if not session.get('model_trained', False):
-        flash('Please upload a dataset first to see predictions.', 'warning')
+    user_id = session.get('user_id', 'unknown')
+    model_trained = session.get('model_trained', False)
+    
+    # ✅ Debug logging
+    app_logger.info(f"Predictions route: model_trained={model_trained}, user={user_id}")
+
+    # ✅ Check if model is trained  
+    if not model_trained:
+        app_logger.warning(f"User {user_id} tried to view predictions but model_trained=False in session")
+        flash('📊 Please upload a dataset first to see predictions.', 'warning')
         return redirect(url_for('upload'))
     
-    # Get ALL analysis results from session
-    ml_predictions = session.get('future_predictions', [])
-    training_results = session.get('training_results', {})
-    insights = session.get('insights', {})
-    trained_model = session.get('trained_model', {})
-    
-    # Get automatic analysis results
-    eda_results = session.get('eda_results', {})
-    seasonal_patterns = session.get('seasonal_patterns', {})
-    peak_periods = session.get('peak_periods', {})
-    monthly_trends = session.get('monthly_trends', {})
-    store_analysis = session.get('store_analysis', {})
-
-    if not ml_predictions:
-        flash('No predictions available. Please try uploading your data again.', 'error')
+    # Regenerate predictions from saved model and data
+    try:
+        # Load user's data
+        df, _ = load_data(prefer_uploaded=True)
+        if df is None or df.empty:
+            app_logger.error(f"User {user_id} has no data available for predictions")
+            flash('No data found. Please upload a dataset.', 'error')
+            return redirect(url_for('upload'))
+        
+        # Generate predictions fresh
+        ml_predictions, _, _, monthly_predictions = generate_future_predictions(df)
+        
+        if not ml_predictions:
+            app_logger.error(f"Failed to generate predictions for user {user_id}")
+            flash('Failed to generate predictions. Please try uploading again.', 'error')
+            return redirect(url_for('upload'))
+        
+        # Get other data from session
+        training_results = session.get('training_results', {})
+        insights = session.get('insights', {})
+        eda_results = session.get('eda_results', {})
+        seasonal_patterns = session.get('seasonal_patterns', {})
+        
+        # Get peak/low periods and convert lists to single values
+        peak_periods_data = session.get('peak_periods', {})
+        peak_periods_display = {
+            'peak_period': peak_periods_data.get('peak_periods', ['N/A'])[0] if peak_periods_data.get('peak_periods') else 'N/A',
+            'peak_sales': peak_periods_data.get('peak_sales', [0])[0] if peak_periods_data.get('peak_sales') else 0,
+            'low_period': peak_periods_data.get('low_periods', ['N/A'])[-1] if peak_periods_data.get('low_periods') else 'N/A',
+            'low_sales': peak_periods_data.get('low_sales', [0])[-1] if peak_periods_data.get('low_sales') else 0,
+        }
+        
+        monthly_trends = session.get('monthly_trends', {})
+        store_analysis = session.get('store_analysis', {})
+        
+        app_logger.info(f"Predictions generated successfully for user {user_id}: {len(ml_predictions)} predictions")
+        
+        return render_template(
+            'predictions.html',
+            ml_predictions=ml_predictions,
+            monthly_predictions=monthly_predictions,
+            training_results=training_results,
+            insights=insights,
+            feature_importance={},
+            model_trained=True,
+            data_uploaded=True,
+            # ⚡ Automatic Analysis Results ⚡
+            eda_results=eda_results,
+            seasonal_patterns=seasonal_patterns,
+            peak=peak_periods_display,
+            monthly_trends=monthly_trends,
+            store_analysis=store_analysis
+        )
+        
+    except Exception as e:
+        app_logger.error(f"Error loading predictions for user {user_id}: {str(e)}", exc_info=True)
+        flash(f'Error loading predictions: {str(e)}', 'error')
         return redirect(url_for('upload'))
-
-    return render_template(
-        'predictions.html',
-        ml_predictions=ml_predictions,
-        training_results=training_results,
-        insights=insights,
-        feature_importance=trained_model.get('feature_importance', {}) if trained_model else {},
-        model_trained=True,
-        data_uploaded=upload_completed,
-        # ⚡ Automatic Analysis Results ⚡
-        eda_results=eda_results,
-        seasonal_patterns=seasonal_patterns,
-        peak_periods=peak_periods,
-        monthly_trends=monthly_trends,
-        store_analysis=store_analysis
-    )
 
 
 # =====================================================
@@ -1524,7 +1837,7 @@ def train_sales_model():
             raise ModelTrainingError(f"Model training failed: {result['error']}")
 
         # Store training results in session for display
-        session['training_results'] = result['results']
+        session['training_results'] = convert_to_json_serializable(result['results'])
         session['model_trained'] = True
 
         app_logger.info(f"Random Forest model trained successfully for user {session['user_id']}")
@@ -1648,6 +1961,611 @@ def cached_predictions():
         'training_metrics': training_results,
         'insights': insights
     })
+
+
+@app.route('/api/enhanced-predictions')
+@login_required
+def api_enhanced_predictions():
+    """Get all enhanced predictions with detailed insights (for API usage)"""
+    if not session.get('model_trained', False):
+        return jsonify({
+            'success': False,
+            'error': 'No trained model available. Please upload data first.',
+            'model_trained': False,
+            'data': {
+                'predictions': [],
+                'summary': {},
+                'training_metrics': {}
+            }
+        }), 400
+    
+    ml_predictions = session.get('future_predictions', [])
+    training_results = session.get('training_results', {})
+    insights = session.get('insights', {})
+    
+    # Calculate summary statistics from predictions
+    if ml_predictions:
+        predicted_sales_values = [p.get('predicted_sales', 0) for p in ml_predictions]
+        summary = {
+            'total_predictions': len(ml_predictions),
+            'average_sales': float(np.mean(predicted_sales_values)) if predicted_sales_values else 0,
+            'max_sales': float(np.max(predicted_sales_values)) if predicted_sales_values else 0,
+            'min_sales': float(np.min(predicted_sales_values)) if predicted_sales_values else 0,
+            'std_sales': float(np.std(predicted_sales_values)) if predicted_sales_values else 0,
+            'forecast_period': '365 days',
+            'high_risk_count': sum(1 for p in ml_predictions if p.get('risk_color') == 'danger'),
+            'medium_risk_count': sum(1 for p in ml_predictions if p.get('risk_color') == 'warning'),
+            'low_risk_count': sum(1 for p in ml_predictions if p.get('risk_color') == 'success'),
+        }
+    else:
+        summary = {
+            'total_predictions': 0,
+            'average_sales': 0,
+            'max_sales': 0,
+            'min_sales': 0,
+            'std_sales': 0,
+            'forecast_period': 'N/A'
+        }
+    
+    return jsonify({
+        'success': True,
+        'model_trained': True,
+        'data': {
+            'predictions': ml_predictions,
+            'summary': summary,
+            'training_metrics': training_results,
+            'insights': insights
+        }
+    })
+
+
+@app.route('/api/download-predictions-csv')
+@login_required
+def download_predictions_csv():
+    """Download predictions as CSV file"""
+    user_id = session.get('user_id', 'unknown')
+    
+    if not session.get('model_trained', False):
+        return jsonify({
+            'success': False,
+            'error': 'No trained model available.'
+        }), 400
+    
+    try:
+        # Load user's data and generate predictions on-demand
+        df, _ = load_data(prefer_uploaded=True)
+        if df is None or df.empty:
+            return jsonify({
+                'success': False,
+                'error': 'No data available.'
+            }), 400
+        
+        # Generate predictions fresh
+        ml_predictions, _, _, monthly_predictions = generate_future_predictions(df)
+        
+        if not ml_predictions:
+            return jsonify({
+                'success': False,
+                'error': 'No predictions available.'
+            }), 400
+        
+        # Create DataFrame from predictions
+        predictions_list = []
+        for pred in ml_predictions:
+            predictions_list.append({
+                'Date': pred.get('date'),
+                'Day': pred.get('day_name'),
+                'Week': pred.get('week'),
+                'Month': pred.get('month'),
+                'Predicted_Sales': pred.get('predicted_sales'),
+                'vs_Average_%': pred.get('percent_vs_average'),
+                'vs_Monthly_%': pred.get('percent_vs_monthly'),
+                'Trend': pred.get('trend_direction'),
+                'Trend_%': pred.get('trend_percentage'),
+                'Performance': pred.get('performance'),
+                'Seasonal_Note': pred.get('seasonal_note'),
+                'Risk_Level': pred.get('risk_level'),
+                'Confidence_Range': f"{pred.get('confidence_lower'):.0f} - {pred.get('confidence_upper'):.0f}",
+                'Store': pred.get('store_name'),
+            })
+        
+        df_csv = pd.DataFrame(predictions_list)
+        
+        # Create CSV string
+        csv_string = df_csv.to_csv(index=False)
+        
+        response = make_response(csv_string)
+        response.headers['Content-Type'] = 'text/csv'
+        response.headers['Content-Disposition'] = 'attachment; filename=sales_predictions.csv'
+        return response
+        
+    except Exception as e:
+        app_logger.error(f"Error downloading predictions CSV for user {user_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to generate CSV: {str(e)}'
+        }), 500
+
+
+@app.route('/api/download-predictions-excel')
+@login_required
+def download_predictions_excel():
+    """Download predictions as Excel file with formatting"""
+    user_id = session.get('user_id', 'unknown')
+    
+    if not session.get('model_trained', False):
+        return jsonify({'success': False, 'error': 'No trained model available.'}), 400
+    
+    try:
+        # Load user's data and generate predictions on-demand
+        df, _ = load_data(prefer_uploaded=True)
+        if df is None or df.empty:
+            return jsonify({
+                'success': False,
+                'error': 'No data available.'
+            }), 400
+        
+        # Generate predictions fresh
+        ml_predictions, _, _, monthly_predictions = generate_future_predictions(df)
+        
+        if not ml_predictions:
+            return jsonify({'success': False, 'error': 'No predictions available.'}), 400
+        
+        # Create workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Predictions"
+        
+        # Define styles
+        header_fill = PatternFill(start_color="667eea", end_color="667eea", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=12)
+        summary_fill = PatternFill(start_color="f0f0f0", end_color="f0f0f0", fill_type="solid")
+        summary_font = Font(bold=True, size=11)
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        center_alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Add summary section
+        ws['A1'] = "SALES PREDICTIONS REPORT"
+        ws['A1'].font = Font(bold=True, size=14, color="667eea")
+        ws['A2'] = f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        ws['A3'] = f"Total Predictions: {len(ml_predictions)}"
+        
+        # Add headers
+        headers = ['Date', 'Day', 'Week', 'Month', 'Predicted Sales', 'vs Average %', 'Trend', 
+                   'Performance', 'Seasonal Note', 'Risk Level', 'Confidence Range', 'Store']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=5, column=col)
+            cell.value = header
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = center_alignment
+            cell.border = border
+        
+        # Add prediction data
+        for row, pred in enumerate(ml_predictions, 6):
+            ws.cell(row=row, column=1).value = pred.get('date')
+            ws.cell(row=row, column=2).value = pred.get('day_name')
+            ws.cell(row=row, column=3).value = pred.get('week')
+            ws.cell(row=row, column=4).value = pred.get('month')
+            ws.cell(row=row, column=5).value = float(pred.get('predicted_sales', 0))
+            ws.cell(row=row, column=6).value = pred.get('percent_vs_average')
+            ws.cell(row=row, column=7).value = pred.get('trend_direction')
+            ws.cell(row=row, column=8).value = pred.get('performance')
+            ws.cell(row=row, column=9).value = pred.get('seasonal_note')
+            ws.cell(row=row, column=10).value = pred.get('risk_level')
+            ws.cell(row=row, column=11).value = f"{pred.get('confidence_lower'):.0f} - {pred.get('confidence_upper'):.0f}"
+            ws.cell(row=row, column=12).value = pred.get('store_name')
+            
+            for col in range(1, 13):
+                ws.cell(row=row, column=col).border = border
+        
+        # Adjust column widths
+        ws.column_dimensions['A'].width = 12
+        ws.column_dimensions['B'].width = 12
+        ws.column_dimensions['C'].width = 10
+        ws.column_dimensions['D'].width = 10
+        ws.column_dimensions['E'].width = 18
+        ws.column_dimensions['F'].width = 15
+        ws.column_dimensions['G'].width = 12
+        ws.column_dimensions['H'].width = 15
+        ws.column_dimensions['I'].width = 16
+        ws.column_dimensions['J'].width = 12
+        ws.column_dimensions['K'].width = 18
+        ws.column_dimensions['L'].width = 15
+        
+        # Save to bytes
+        excel_bytes = BytesIO()
+        wb.save(excel_bytes)
+        excel_bytes.seek(0)
+        
+        response = make_response(excel_bytes.getvalue())
+        response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        response.headers['Content-Disposition'] = 'attachment; filename=sales_predictions.xlsx'
+        return response
+        
+    except Exception as e:
+        app_logger.error(f"Error downloading predictions Excel: {str(e)}")
+        return jsonify({'success': False, 'error': f'Failed to generate Excel: {str(e)}'}), 500
+
+
+@app.route('/api/download-predictions-json')
+@login_required
+def download_predictions_json():
+    """Download predictions as JSON file"""
+    user_id = session.get('user_id', 'unknown')
+    
+    if not session.get('model_trained', False):
+        return jsonify({'success': False, 'error': 'No trained model available.'}), 400
+    
+    try:
+        # Load user's data and generate predictions on-demand
+        df, _ = load_data(prefer_uploaded=True)
+        if df is None or df.empty:
+            return jsonify({
+                'success': False,
+                'error': 'No data available.'
+            }), 400
+        
+        # Generate predictions fresh
+        ml_predictions, _, _, monthly_predictions = generate_future_predictions(df)
+        
+        if not ml_predictions:
+            return jsonify({'success': False, 'error': 'No predictions available.'}), 400
+        
+        # Get other data from session
+        training_results = session.get('training_results', {})
+        insights = session.get('insights', {})
+        
+        # Prepare summary statistics
+        predicted_sales = [float(p.get('predicted_sales', 0)) for p in ml_predictions]
+        summary = {
+            'report_date': datetime.now().isoformat(),
+            'forecast_period_days': len(ml_predictions),
+            'average_sales': float(np.mean(predicted_sales)) if predicted_sales else 0,
+            'max_sales': float(np.max(predicted_sales)) if predicted_sales else 0,
+            'min_sales': float(np.min(predicted_sales)) if predicted_sales else 0,
+            'std_sales': float(np.std(predicted_sales)) if predicted_sales else 0,
+            'total_forecasted_sales': float(np.sum(predicted_sales)) if predicted_sales else 0,
+        }
+        
+        data = {
+            'metadata': {
+                'title': 'Sales Predictions Report',
+                'generated_at': datetime.now().isoformat(),
+                'version': '1.0'
+            },
+            'summary': summary,
+            'training_metrics': training_results,
+            'insights': insights,
+            'predictions': ml_predictions,
+            'monthly_predictions': monthly_predictions
+        }
+        
+        json_string = json.dumps(data, indent=2, default=str)
+        response = make_response(json_string)
+        response.headers['Content-Type'] = 'application/json'
+        response.headers['Content-Disposition'] = 'attachment; filename=sales_predictions.json'
+        return response
+        
+    except Exception as e:
+        app_logger.error(f"Error downloading predictions JSON for user {user_id}: {str(e)}")
+        return jsonify({'success': False, 'error': f'Failed to generate JSON: {str(e)}'}), 500
+
+
+@app.route('/api/generate-pdf-report', methods=['POST'])
+@login_required
+def generate_pdf_report():
+    """Generate a comprehensive PDF report of predictions"""
+    user_id = session.get('user_id', 'unknown')
+    
+    if not session.get('model_trained', False):
+        return jsonify({'success': False, 'error': 'No trained model available.'}), 400
+    
+    try:
+        # Load user's data and generate predictions on-demand
+        df, _ = load_data(prefer_uploaded=True)
+        if df is None or df.empty:
+            return jsonify({
+                'success': False,
+                'error': 'No data available.'
+            }), 400
+        
+        # Generate predictions fresh
+        ml_predictions, _, _, monthly_predictions = generate_future_predictions(df)
+        
+        if not ml_predictions:
+            return jsonify({'success': False, 'error': 'No predictions available.'}), 400
+        
+        # Get other data from session
+        training_results = session.get('training_results', {})
+        insights = session.get('insights', {})
+        eda_results = session.get('eda_results', {})
+        
+        # Create PDF
+        pdf_buffer = BytesIO()
+        doc = SimpleDocTemplate(pdf_buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#667eea'),
+            spaceAfter=30,
+            alignment=1  # center
+        )
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.HexColor('#764ba2'),
+            spaceAfter=12,
+            spaceBefore=12
+        )
+        
+        story = []
+        
+        # Title
+        story.append(Paragraph("📊 Sales Predictions Report", title_style))
+        story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %H:%M:%S')}", styles['Normal']))
+        story.append(Spacer(1, 0.3*inch))
+        
+        # Executive Summary
+        story.append(Paragraph("Executive Summary", heading_style))
+        predicted_sales = [float(p.get('predicted_sales', 0)) for p in ml_predictions]
+        summary_text = f"""
+        This report provides a comprehensive analysis of sales predictions for the next 365 days using an advanced Random Forest machine learning model. 
+        The analysis includes {len(ml_predictions)} daily predictions with confidence intervals and risk assessments.
+        <br/><br/>
+        <b>Key Metrics:</b><br/>
+        • Total Predictions: {len(ml_predictions)} days<br/>
+        • Average Daily Sales: ${float(np.mean(predicted_sales)):.2f}<br/>
+        • Maximum Predicted Sales: ${float(np.max(predicted_sales)):.2f}<br/>
+        • Minimum Predicted Sales: ${float(np.min(predicted_sales)):.2f}<br/>
+        • Total Forecasted Sales (12 months): ${float(np.sum(predicted_sales)):.2f}<br/>
+        """
+        story.append(Paragraph(summary_text, styles['Normal']))
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Model Performance
+        story.append(Paragraph("Model Performance Metrics", heading_style))
+        perf_text = f"""
+        <b>Random Forest Model Accuracy:</b><br/>
+        • R² Score: {training_results.get('r2', 0):.4f}<br/>
+        • Mean Absolute Error (MAE): ${training_results.get('mae', 0):.2f}<br/>
+        • Root Mean Squared Error (RMSE): ${training_results.get('rmse', 0):.2f}<br/>
+        • Training Samples: {training_results.get('n_samples', 0)}<br/>
+        """
+        story.append(Paragraph(perf_text, styles['Normal']))
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Key Insights
+        story.append(Paragraph("Key Insights & Trends", heading_style))
+        insights_text = f"""
+        <b>Peak Month:</b> {insights.get('peak_month', 'N/A')}<br/>
+        <b>Growth Trend:</b> {insights.get('trend', 'N/A')}<br/>
+        <b>Volatility:</b> {'High' if eda_results.get('std_sales', 0) > 1000 else 'Medium' if eda_results.get('std_sales', 0) > 500 else 'Low'}<br/>
+        """
+        story.append(Paragraph(insights_text, styles['Normal']))
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Predictions Table (first 30 days)
+        story.append(Paragraph("30-Day Forecast Preview", heading_style))
+        story.append(Spacer(1, 0.1*inch))
+        
+        table_data = [['Date', 'Sales', 'vs Avg', 'Trend', 'Risk', 'Confidence']]
+        for pred in ml_predictions[:30]:
+            table_data.append([
+                pred.get('date', ''),
+                f"${float(pred.get('predicted_sales', 0)):.0f}",
+                pred.get('percent_vs_average', ''),
+                pred.get('trend_direction', ''),
+                pred.get('risk_level', ''),
+                f"${float(pred.get('confidence_lower', 0)):.0f} - ${float(pred.get('confidence_upper', 0)):.0f}"
+            ])
+        
+        table = Table(table_data, colWidths=[1.2*inch, 1*inch, 1*inch, 0.8*inch, 0.8*inch, 1.5*inch])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ]))
+        story.append(table)
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Recommendations
+        story.append(Paragraph("Recommendations", heading_style))
+        recommendations = """
+        <b>Action Items:</b><br/>
+        1. <b>Inventory Management:</b> Prepare inventory levels based on predicted demand peaks<br/>
+        2. <b>Marketing Focus:</b> Concentrate promotional efforts during predicted peak sales periods<br/>
+        3. <b>Risk Mitigation:</b> Monitor high-risk prediction days closely for potential market disruptions<br/>
+        4. <b>Resource Planning:</b> Allocate staff and resources based on forecasted sales volumes<br/>
+        5. <b>Performance Tracking:</b> Compare actual sales with predictions to refine the model continuously<br/>
+        """
+        story.append(Paragraph(recommendations, styles['Normal']))
+        story.append(Spacer(1, 0.3*inch))
+        
+        # Footer
+        footer_text = """
+        <i>This report was automatically generated by the Seasonal Sales Forecasting System. 
+        For questions or updates, please contact the analytics team.</i>
+        """
+        story.append(Paragraph(footer_text, styles['Normal']))
+        
+        # Build PDF
+        doc.build(story)
+        pdf_buffer.seek(0)
+        
+        response = make_response(pdf_buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = 'attachment; filename=sales_predictions_report.pdf'
+        return response
+        
+    except Exception as e:
+        app_logger.error(f"Error generating PDF report for user {user_id}: {str(e)}")
+        return jsonify({'success': False, 'error': f'Failed to generate PDF: {str(e)}'}), 500
+
+
+@app.route('/api/save-predictions-settings', methods=['POST'])
+@login_required
+def save_predictions_settings():
+    """Save user preferences for predictions (confidence level, forecast horizon, etc.)"""
+    try:
+        data = request.get_json()
+        
+        # Store settings in session
+        if 'confidenceLevel' in data:
+            session['confidence_level'] = int(data['confidenceLevel'])
+        if 'forecastHorizon' in data:
+            session['forecast_horizon'] = int(data['forecastHorizon'])
+        if 'showConfidenceRange' in data:
+            session['show_confidence_range'] = data['showConfidenceRange']
+        if 'showTrends' in data:
+            session['show_trends'] = data['showTrends']
+        if 'showSeasonality' in data:
+            session['show_seasonality'] = data['showSeasonality']
+        
+        session.modified = True
+        
+        return jsonify({
+            'success': True,
+            'message': 'Settings saved successfully',
+            'settings': {
+                'confidenceLevel': session.get('confidence_level', 95),
+                'forecastHorizon': session.get('forecast_horizon', 365),
+                'showConfidenceRange': session.get('show_confidence_range', True),
+                'showTrends': session.get('show_trends', True),
+                'showSeasonality': session.get('show_seasonality', True),
+            }
+        })
+    except Exception as e:
+        app_logger.error(f"Error saving predictions settings: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/load-predictions-settings')
+@login_required
+def load_predictions_settings():
+    """Load user preferences for predictions"""
+    try:
+        return jsonify({
+            'success': True,
+            'settings': {
+                'confidenceLevel': session.get('confidence_level', 95),
+                'forecastHorizon': session.get('forecast_horizon', 365),
+                'showConfidenceRange': session.get('show_confidence_range', True),
+                'showTrends': session.get('show_trends', True),
+                'showSeasonality': session.get('show_seasonality', True),
+            }
+        })
+    except Exception as e:
+        app_logger.error(f"Error loading predictions settings: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/send-predictions-email', methods=['POST'])
+@login_required
+def send_predictions_email():
+    """Send predictions via email (requires email configuration)"""
+    try:
+        data = request.get_json()
+        recipient_email = data.get('email', '')
+        include_charts = data.get('include_charts', True)
+        include_table = data.get('include_table', True)
+        include_insights = data.get('include_insights', True)
+        message = data.get('message', '')
+        
+        # Validate email
+        if not recipient_email or '@' not in recipient_email:
+            return jsonify({'success': False, 'error': 'Invalid email address'}), 400
+        
+        ml_predictions = session.get('future_predictions', [])
+        if not ml_predictions:
+            return jsonify({'success': False, 'error': 'No predictions to send'}), 400
+        
+        # Note: This is a stub implementation. 
+        # For production, configure SMTP settings in app.config
+        app_logger.info(f"Email to {recipient_email} would be sent with predictions report")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Email would be sent to {recipient_email}. (Email functionality requires SMTP configuration)',
+            'note': 'To enable email functionality, configure SMTP settings in app.config or environment variables'
+        })
+        
+    except Exception as e:
+        app_logger.error(f"Error sending email: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/create-share-link', methods=['POST'])
+@login_required  
+def create_share_link():
+    """Create a shareable link for predictions"""
+    try:
+        ml_predictions = session.get('future_predictions', [])
+        if not ml_predictions:
+            return jsonify({'success': False, 'error': 'No predictions to share'}), 400
+        
+        # Generate unique share ID
+        share_id = str(uuid.uuid4())
+        
+        # Store share data in session (in production, use database)
+        if 'shared_predictions' not in session:
+            session['shared_predictions'] = {}
+        
+        session['shared_predictions'][share_id] = {
+            'predictions': ml_predictions,
+            'created_at': datetime.now().isoformat(),
+            'user_id': session.get('user_id'),
+            'expires_at': (datetime.now() + timedelta(days=7)).isoformat()  # 7 day expiry
+        }
+        session.modified = True
+        
+        share_url = f"{request.base_url.rstrip('/')}/predictions-shared/{share_id}"
+        
+        return jsonify({
+            'success': True,
+            'share_url': share_url,
+            'share_id': share_id,
+            'expires_in_days': 7
+        })
+        
+    except Exception as e:
+        app_logger.error(f"Error creating share link: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/predictions-shared/<share_id>')
+def view_shared_predictions(share_id):
+    """View shared predictions"""
+    try:
+        # Get all users' shared predictions (in production, use database)
+        # For now, check if it's in any session - simplified version
+        
+        return render_template(
+            'predictions_shared.html',
+            share_id=share_id,
+            message='Shared predictions view',
+            shared_predictions=[]  # Would be populated from database
+        )
+    except Exception as e:
+        app_logger.error(f"Error viewing shared predictions: {str(e)}")
+        flash('Could not load shared predictions', 'error')
+        return redirect(url_for('predictions'))
 
 
 @app.route('/api/future-sales-prediction', methods=['POST'])
@@ -1843,6 +2761,6 @@ def complete_analysis():
 
 if __name__ == '__main__':
     init_db()
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 8000))  # Changed from 5000 to 8000 to avoid AirTunes conflict
     # debug mode disabled to prevent reloader from interfering when run in background
     app.run(host='127.0.0.1', port=port, debug=False)

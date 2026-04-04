@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Sales Forecasting System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .dashboard-header {
+            background: white;
+            border-radius: 15px;
+            padding: 3rem 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .dashboard-header h1 {
+            font-size: 2.5rem;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .dashboard-header p {
+            color: #666;
+            font-size: 1.1rem;
+            margin-bottom: 0;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .status-card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .status-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+            border-color: #667eea;
+        }
+
+        .status-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .status-title {
+            color: #2c3e50;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .status-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .status-description {
+            color: #999;
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+
+        .welcome-banner {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .welcome-banner h2 {
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        .welcome-banner p {
+            font-size: 1rem;
+            opacity: 0.95;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .action-btn {
+            background: white;
+            color: #2c3e50;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            color: #667eea;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+        }
+
+        .content-section {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .content-section h3 {
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+            font-weight: 700;
+            font-size: 1.4rem;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 1rem;
+        }
+
+        .feature-list {
+            list-style: none;
+        }
+
+        .feature-item {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 8px;
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+        }
+
+        .feature-item-icon {
+            font-size: 1.5rem;
+            color: #667eea;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        .feature-item-content h4 {
+            color: #2c3e50;
+            margin-bottom: 0.3rem;
+            font-weight: 600;
+        }
+
+        .feature-item-content p {
+            color: #666;
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        .sidebar-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .sidebar-card h4 {
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        .quick-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 0.95rem;
+        }
+
+        .stat-label {
+            color: #666;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            color: #667eea;
+            font-weight: 700;
+        }
+
+        .info-box {
+            background: #e8f5e9;
+            border-left: 4px solid #10b981;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .info-box h4 {
+            color: #047857;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .info-box p {
+            color: #1b5e20;
+            font-size: 0.95rem;
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .warning-box h4 {
+            color: #856404;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .warning-box p {
+            color: #856404;
+            font-size: 0.95rem;
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .status-grid {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            }
+
+            .dashboard-header h1 {
+                font-size: 1.8rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-container {
+                padding: 1rem;
+            }
+
+            .dashboard-header {
+                padding: 1.5rem 1rem;
+            }
+
+            .dashboard-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .action-buttons {
+                grid-template-columns: 1fr;
+            }
+
+            .status-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .content-section {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📊 Sales Forecasting Hub</h1>
+        <ul class="nav-links">
+            <li><a href="/dashboard" class="active">Dashboard</a></li>
+            <li><a href="/upload">Upload</a></li>
+            {% if data_uploaded %}
+            <li><a href="/analysis">Analysis</a></li>
+            <li><a href="/predictions">Predictions</a></li>
+            <li><a href="/recommendation">Recommendations</a></li>
+            {% endif %}
+            <li><a href="/logout">Logout</a></li>
+        </ul>
+    </header>
+
+    <div class="dashboard-container">
+        <!-- Dashboard Header -->
+        <div class="dashboard-header">
+            <h1>📈 Welcome to Your Sales Dashboard</h1>
+            <p>Comprehensive analytics and forecasting for your business</p>
+        </div>
+
+        <!-- Welcome Banner -->
+        {% if not data_uploaded %}
+        <div class="welcome-banner">
+            <h2>🚀 Get Started in 3 Steps</h2>
+            <p>Upload your sales data and let our AI-powered system automatically analyze trends, train machine learning models, and generate accurate 365-day forecasts with actionable insights.</p>
+            <div class="action-buttons">
+                <a href="/upload" class="action-btn">
+                    <i class="fas fa-cloud-upload-alt"></i> Upload Data Now
+                </a>
+                <a href="#features" class="action-btn">
+                    <i class="fas fa-info-circle"></i> Learn More
+                </a>
+            </div>
+        </div>
+
+        <!-- Features Section -->
+        <div id="features" style="margin-bottom: 2rem;">
+            <div class="main-content">
+                <div class="content-section">
+                    <h3>✨ What You Can Do</h3>
+                    <ul class="feature-list">
+                        <li class="feature-item">
+                            <div class="feature-item-icon">📤</div>
+                            <div class="feature-item-content">
+                                <h4>Upload Sales Data</h4>
+                                <p>Simply upload your CSV file with sales history. We support various formats and automatically clean the data.</p>
+                            </div>
+                        </li>
+                        <li class="feature-item">
+                            <div class="feature-item-icon">📊</div>
+                            <div class="feature-item-content">
+                                <h4>Automated Analysis</h4>
+                                <p>Explore trends, seasonal patterns, peak periods, and store performance automatically.</p>
+                            </div>
+                        </li>
+                        <li class="feature-item">
+                            <div class="feature-item-icon">🤖</div>
+                            <div class="feature-item-content">
+                                <h4>ML Model Training</h4>
+                                <p>Advanced Random Forest algorithm trains automatically on your data to learn patterns.</p>
+                            </div>
+                        </li>
+                        <li class="feature-item">
+                            <div class="feature-item-icon">🔮</div>
+                            <div class="feature-item-content">
+                                <h4>365-Day Forecast</h4>
+                                <p>Get detailed sales predictions for the next year with confidence intervals and insights.</p>
+                            </div>
+                        </li>
+                        <li class="feature-item">
+                            <div class="feature-item-icon">💡</div>
+                            <div class="feature-item-content">
+                                <h4>AI Recommendations</h4>
+                                <p>Receive intelligent suggestions based on your data patterns and forecast results.</p>
+                            </div>
+                        </li>
+                        <li class="feature-item">
+                            <div class="feature-item-icon">📥</div>
+                            <div class="feature-item-content">
+                                <h4>Multiple Export Formats</h4>
+                                <p>Download predictions as CSV, Excel, PDF, or JSON for integration with your tools.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div style="display: flex; flex-direction: column;">
+                    <div class="sidebar-card">
+                        <h4>🎯 Quick Start</h4>
+                        <div class="info-box">
+                            <h4 style="margin-top: 0;">Ready to Begin?</h4>
+                            <p>Click the button below to upload your first dataset and experience the full power of our forecasting system.</p>
+                        </div>
+                        <a href="/upload" class="action-btn" style="width: 100%; margin-bottom: 1rem;">
+                            <i class="fas fa-upload"></i> Upload File
+                        </a>
+                    </div>
+
+                    <div class="sidebar-card">
+                        <h4>📋 Requirements</h4>
+                        <div class="quick-stats">
+                            <div class="stat-row">
+                                <span class="stat-label">Format</span>
+                                <span class="stat-value">CSV</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Min. Records</span>
+                                <span class="stat-value">30+ days</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Max. File Size</span>
+                                <span class="stat-value">50 MB</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Required Cols</span>
+                                <span class="stat-value">Date, Sales</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-card">
+                        <h4>🔒 Data Security</h4>
+                        <div class="info-box" style="margin-bottom: 0;">
+                            <p>Your data is processed securely and stored in encrypted form. We never share your data with third parties.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% else %}
+
+        <!-- Data Uploaded - Show Statistics -->
+        <div class="status-grid">
+            <div class="status-card">
+                <div class="status-icon">✅</div>
+                <div class="status-title">Data Status</div>
+                <div class="status-value">Uploaded</div>
+                <div class="status-description">Ready for analysis</div>
+            </div>
+            <div class="status-card">
+                <div class="status-icon">🤖</div>
+                <div class="status-title">Model Status</div>
+                <div class="status-value">Trained</div>
+                <div class="status-description">Ready to predict</div>
+            </div>
+            <div class="status-card">
+                <div class="status-icon">📊</div>
+                <div class="status-title">Analysis</div>
+                <div class="status-value">Complete</div>
+                <div class="status-description">View insights</div>
+            </div>
+            <div class="status-card">
+                <div class="status-icon">🔮</div>
+                <div class="status-title">Predictions</div>
+                <div class="status-value">365 Days</div>
+                <div class="status-description">Ready to view</div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <a href="/analysis" class="action-btn">
+                <i class="fas fa-chart-bar"></i> View Analysis
+            </a>
+            <a href="/predictions" class="action-btn">
+                <i class="fas fa-crystal-ball"></i> View Predictions
+            </a>
+            <a href="/recommendation" class="action-btn">
+                <i class="fas fa-lightbulb"></i> Get Recommendations
+            </a>
+            <a href="/upload" class="action-btn">
+                <i class="fas fa-cloud-upload-alt"></i> Upload New Data
+            </a>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="content-section">
+                <h3>📊 What's Available</h3>
+                <ul class="feature-list">
+                    <li class="feature-item">
+                        <div class="feature-item-icon">📈</div>
+                        <div class="feature-item-content">
+                            <h4>Analysis Page</h4>
+                            <p>Comprehensive exploratory data analysis with visualizations of trends, seasonality, and patterns.</p>
+                        </div>
+                    </li>
+                    <li class="feature-item">
+                        <div class="feature-item-icon">🔮</div>
+                        <div class="feature-item-content">
+                            <h4>Predictions Page</h4>
+                            <p>365-day sales forecast with filters, comparisons, and multiple export options.</p>
+                        </div>
+                    </li>
+                    <li class="feature-item">
+                        <div class="feature-item-icon">💡</div>
+                        <div class="feature-item-content">
+                            <h4>Recommendations</h4>
+                            <p>AI-generated insights and actionable recommendations based on your data.</p>
+                        </div>
+                    </li>
+                    <li class="feature-item">
+                        <div class="feature-item-icon">📊</div>
+                        <div class="feature-item-content">
+                            <h4>Dashboard</h4>
+                            <p>Quick overview of your sales data status and system readiness.</p>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+
+            <div style="display: flex; flex-direction: column;">
+                <div class="sidebar-card">
+                    <h4>🚀 Next Steps</h4>
+                    <div class="info-box">
+                        <h4 style="margin-top: 0;">Explore Results</h4>
+                        <p>Check out the Analysis page to see detailed data insights, or jump to Predictions to see your forecast.</p>
+                    </div>
+                </div>
+
+                <div class="sidebar-card">
+                    <h4>📥 Export Data</h4>
+                    <p>All your predictions and analyses can be exported in multiple formats:</p>
+                    <div class="quick-stats" style="margin-top: 1rem;">
+                        <div class="stat-row">
+                            <span class="stat-label">CSV</span>
+                            <span class="stat-value">✓</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Excel</span>
+                            <span class="stat-value">✓</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">PDF Report</span>
+                            <span class="stat-value">✓</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">JSON</span>
+                            <span class="stat-value">✓</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-card">
+                    <h4>🔄 Upload New Data</h4>
+                    <div class="warning-box" style="margin-bottom: 0;">
+                        <p>Need to analyze different data? Upload a new CSV file to start fresh analysis and training.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% endif %}
+    </div>
+
+    <footer>
+        <p>&copy; 2024 <strong>Seasonal Sales Forecasting System</strong> - Smart Analytics & Predictions | All Rights Reserved</p>
+    </footer>
+
+    <script>
+        // Add smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+
+        // Highlight active nav link
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            if (link.href === window.location.href) {
+                link.classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>

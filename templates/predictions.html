@@ -6,8 +6,62 @@
     <title>ML Sales Predictions - Seasonal Sales Forecasting</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
     <style>
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --success-color: #10b981;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #2196F3;
+            --light-bg: #f8f9fa;
+            --dark-bg: #1a1a1a;
+            --text-light: #2c3e50;
+            --text-dark: #ffffff;
+            --border-color: #e0e0e0;
+        }
+
+        body.dark-mode {
+            background-color: #0d1117;
+            color: var(--text-dark);
+        }
+
+        body.dark-mode .predictions-header {
+            background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+        }
+
+        body.dark-mode .metric-card,
+        body.dark-mode .predictions-chart-container,
+        body.dark-mode .feature-importance-section {
+            background: #1e1e1e;
+            border-color: #333;
+            color: var(--text-dark);
+        }
+
+        body.dark-mode .metric-label,
+        body.dark-mode .chart-title {
+            color: #ccc;
+        }
+
+        body.dark-mode table {
+            background: #1e1e1e;
+            color: var(--text-dark);
+        }
+
+        body.dark-mode table th {
+            background: #2d2d2d;
+            border-color: #333;
+            color: #ccc;
+        }
+
+        body.dark-mode table td {
+            border-color: #333;
+        }
+
         .predictions-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -16,6 +70,39 @@
             margin-bottom: 2rem;
             text-align: center;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 2rem;
+        }
+
+        .header-content {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .theme-toggle, .share-predict-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            color: white;
+            padding: 0.6rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover, .share-predict-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
         }
 
         .predictions-header h1 {
@@ -36,13 +123,19 @@
             padding: 1.5rem;
             margin-bottom: 1.5rem;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            border: 1px solid #e0e0e0;
+            border: 1px solid var(--border-color);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
         }
 
         .metric-value {
             font-size: 2rem;
             font-weight: 700;
-            color: #2c3e50;
+            color: var(--text-light);
             margin-bottom: 0.5rem;
         }
 
@@ -53,13 +146,43 @@
             letter-spacing: 0.5px;
         }
 
+        .opportunity-card {
+            background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%);
+            border-left: 5px solid var(--success-color);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .risk-card {
+            background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);
+            border-left: 5px solid var(--danger-color);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .filter-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--border-color);
+        }
+
+        body.dark-mode .filter-panel {
+            background: #1e1e1e;
+            border-color: #333;
+        }
+
         .predictions-chart-container {
             background: white;
             border-radius: 12px;
             padding: 2rem;
             margin-bottom: 2rem;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            border: 1px solid #e0e0e0;
+            border: 1px solid var(--border-color);
         }
 
         .chart-header {
@@ -67,13 +190,49 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 1.5rem;
+            flex-wrap: wrap;
         }
 
         .chart-title {
             font-size: 1.5rem;
             font-weight: 700;
-            color: #2c3e50;
+            color: var(--text-light);
             margin: 0;
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .export-btn {
+            background: white;
+            border: 2px solid #ddd;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .export-btn:hover {
+            background: #f0f0f0;
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        body.dark-mode .export-btn {
+            background: #2d2d2d;
+            border-color: #444;
+            color: #ccc;
+        }
+
+        body.dark-mode .export-btn:hover {
+            background: #3d3d3d;
+            border-color: #667eea;
+            color: #667eea;
         }
 
         .feature-importance-section {
@@ -82,23 +241,110 @@
             padding: 2rem;
             margin-bottom: 2rem;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            border: 1px solid #e0e0e0;
+            border: 1px solid var(--border-color);
         }
 
         .feature-importance-section h3 {
-            color: #2c3e50;
+            color: var(--text-light);
             margin-bottom: 1rem;
         }
 
-        .feature-importance-chart {
-            height: 300px;
+        .predictions-table {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--border-color);
         }
 
-        .action-buttons {
-            display: flex;
+        .predictions-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .predictions-table th {
+            background: #f8f9fa;
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-light);
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .predictions-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .predictions-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .sales-amount {
+            font-weight: 700;
+            color: #28a745;
+        }
+
+        .confidence-range {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .table-search {
+            margin-bottom: 1.5rem;
+        }
+
+        .table-search input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+            font-size: 1rem;
+        }
+
+        .table-search input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        body.dark-mode .table-search input {
+            background: #2d2d2d;
+            border-color: #444;
+            color: white;
+        }
+
+        .filters-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 1rem;
-            justify-content: center;
-            margin-top: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-light);
+        }
+
+        .filter-group select,
+        .filter-group input {
+            padding: 0.6rem;
+            border-radius: 6px;
+            border: 2px solid #ddd;
+            font-size: 0.95rem;
+        }
+
+        body.dark-mode .filter-group select,
+        body.dark-mode .filter-group input {
+            background: #2d2d2d;
+            border-color: #444;
+            color: white;
         }
 
         .btn-primary-custom {
@@ -110,6 +356,8 @@
             text-decoration: none;
             font-weight: 600;
             transition: all 0.3s ease;
+            cursor: pointer;
+            display: inline-block;
         }
 
         .btn-primary-custom:hover {
@@ -137,48 +385,86 @@
             text-decoration: none;
         }
 
-        .predictions-table {
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            border: 1px solid #e0e0e0;
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+            flex-wrap: wrap;
         }
 
-        .predictions-table table {
+        .settings-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
             width: 100%;
-            border-collapse: collapse;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
         }
 
-        .predictions-table th {
-            background: #f8f9fa;
-            padding: 1rem;
-            text-align: left;
-            font-weight: 600;
-            color: #2c3e50;
-            border-bottom: 2px solid #e0e0e0;
+        .settings-modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 2rem;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
         }
 
-        .predictions-table td {
-            padding: 1rem;
-            border-bottom: 1px solid #f0f0f0;
+        body.dark-mode .settings-modal-content {
+            background-color: #1e1e1e;
+            color: white;
         }
 
-        .predictions-table tr:last-child td {
-            border-bottom: none;
+        .close-modal {
+            color: #aaa;
+            float: right;
+            font-size: 2rem;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
         }
 
-        .sales-amount {
-            font-weight: 700;
-            color: #28a745;
+        .close-modal:hover {
+            color: #000;
         }
 
-        .confidence-range {
-            color: #6c757d;
-            font-size: 0.9rem;
+        body.dark-mode .close-modal:hover {
+            color: #fff;
+        }
+
+        .report-button {
+            margin-bottom: 1rem;
+        }
+
+        .metric-highlight {
+            background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .metric-highlight i {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
         }
 
         @media (max-width: 768px) {
+            .predictions-header {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .header-controls {
+                justify-content: center;
+            }
+
             .predictions-header h1 {
                 font-size: 2rem;
             }
@@ -197,6 +483,19 @@
                 width: 100%;
                 text-align: center;
                 margin-bottom: 0.5rem;
+            }
+
+            .chart-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .export-buttons {
+                justify-content: flex-start;
+            }
+
+            .filters-group {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -218,19 +517,83 @@
     </header>
 
     <div class="container">
-        <!-- Header -->
+        <!-- Header with Controls -->
         <div class="predictions-header">
-            <h1>🎯 ML Sales Predictions</h1>
-            {% if ml_predictions and ml_predictions[0].store_name %}
-            <div style="font-size: 1.1rem; margin-bottom: 0.5rem;">
-                <strong>📍 {{ ml_predictions[0].store_name }}</strong>
+            <div class="header-content">
+                <h1>🎯 ML Sales Predictions</h1>
+                {% if ml_predictions and ml_predictions[0].store_name %}
+                <div style="font-size: 1.1rem; margin-bottom: 0.5rem;">
+                    <strong>📍 {{ ml_predictions[0].store_name }}</strong>
+                </div>
+                {% endif %}
+                <p>Your Random Forest model has analyzed your data and generated accurate sales predictions for the next 12 months</p>
             </div>
-            {% endif %}
-            <p>Your Random Forest model has analyzed your data and generated accurate sales predictions for the next 12 months</p>
+            <div class="header-controls">
+                <button class="theme-toggle" onclick="toggleDarkMode()">
+                    <i class="fas fa-moon"></i> Dark Mode
+                </button>
+                <button class="share-predict-btn" onclick="openShareModal()">
+                    <i class="fas fa-share-alt"></i> Share
+                </button>
+                <button class="share-predict-btn" onclick="openSettingsModal()">
+                    <i class="fas fa-cog"></i> Settings
+                </button>
+            </div>
         </div>
 
-        {% if model_trained and ml_predictions %}
-        <!-- Model Performance Summary -->
+        {% if ml_predictions %}
+        <!-- ✅ SUCCESS: What Was Done Automatically -->
+        <div style="background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%); border-left: 5px solid #10b981; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
+            <h4 style="color: #047857; margin: 0 0 1rem 0; font-size: 1.1rem;">✅ Automatic Processing Complete!</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem; font-size: 0.95rem; color: #065f46;">
+                <div>✓ <strong>Data Validated</strong><br><span style="font-size: 0.85rem; color: #047857;">Structure & format checked</span></div>
+                <div>✓ <strong>EDA Performed</strong><br><span style="font-size: 0.85rem; color: #047857;">Full analysis completed</span></div>
+                <div>✓ <strong>ML Model Trained</strong><br><span style="font-size: 0.85rem; color: #047857;">Random Forest learned patterns</span></div>
+                <div>✓ <strong>365 Days Forecast</strong><br><span style="font-size: 0.85rem; color: #047857;">Predictions generated</span></div>
+            </div>
+        </div>
+
+        {% endif %}
+
+        <!-- ⭐ KEY METRICS SUMMARY: Top Opportunities & Risks -->
+        <div style="margin-bottom: 2rem;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem;">
+                <h3 style="margin: 0 0 0.5rem 0;">⭐ Key Insights & Opportunities</h3>
+                <p style="margin: 0; opacity: 0.9;">Quick highlights of what matters most</p>
+            </div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="opportunity-card">
+                        <h5 style="color: #047857; margin: 0 0 0.5rem 0;">🚀 Biggest Opportunity</h5>
+                        <div style="font-weight: 700; color: #065f46; margin-bottom: 0.5rem;" id="biggest-opportunity">
+                            Loading...
+                        </div>
+                        <small style="color: #047857;">Day with highest predicted sales</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="risk-card">
+                        <h5 style="color: #991b1b; margin: 0 0 0.5rem 0;">⚠️ Highest Risk Day</h5>
+                        <div style="font-weight: 700; color: #7f1d1d; margin-bottom: 0.5rem;" id="highest-risk">
+                            Loading...
+                        </div>
+                        <small style="color: #991b1b;">Day with lowest predicted sales</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="opportunity-card">
+                        <h5 style="color: #047857; margin: 0 0 0.5rem 0;">📊 Promo Opportunity</h5>
+                        <div style="font-weight: 700; color: #065f46; margin-bottom: 0.5rem;" id="promo-opportunity">
+                            Loading...
+                        </div>
+                        <small style="color: #047857;">Best day to run promotions</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODEL PERFORMANCE SUMMARY -->
         <div class="row mb-4">
             <div class="col-md-3">
                 <div class="metric-card">
@@ -329,52 +692,264 @@
         <div class="predictions-chart-container">
             <div class="chart-header">
                 <h2 class="chart-title">📈 1-Year Sales Forecast</h2>
-                <div class="chart-legend">
-                    <span style="color: #4CAF50; font-weight: 600;">● Predicted Sales</span>
-                    <span style="color: rgba(255, 99, 132, 0.5); font-weight: 600; margin-left: 1rem;">● Confidence Range</span>
+                <div class="export-buttons">
+                    <button class="export-btn" onclick="exportToCSV()"><i class="fas fa-download"></i> CSV</button>
+                    <button class="export-btn" onclick="exportToExcel()"><i class="fas fa-file-excel"></i> Excel</button>
+                    <button class="export-btn" onclick="exportToPDF()"><i class="fas fa-file-pdf"></i> PDF</button>
+                    <button class="export-btn" onclick="exportToJSON()"><i class="fas fa-file-code"></i> JSON</button>
                 </div>
             </div>
-            <canvas id="predictionsChart" width="400" height="150"></canvas>
+            <div style="position: relative; height: 450px; width: 100%; margin-top: 1rem;">
+                <canvas id="predictionsChart"></canvas>
+            </div>
         </div>
 
-        <!-- Detailed Predictions Table -->
-        <div class="predictions-table">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Store</th>
-                        <th>Predicted Sales</th>
-                        <th>Confidence Range</th>
-                        <th>Growth Trend</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for prediction in ml_predictions %}
-                    <tr>
-                        <td><strong>{{ prediction.month }}</strong></td>
-                        <td>{{ prediction.store_name }}</td>
-                        <td><span class="sales-amount">${{ "%.2f"|format(prediction.predicted_sales) }}</span></td>
-                        <td>
-                            <span class="confidence-range">
-                                ${{ "%.2f"|format(prediction.confidence_lower) }} - ${{ "%.2f"|format(prediction.confidence_upper) }}
-                            </span>
-                        </td>
-                        <td>
-                            {% if loop.first %}
-                                <span style="color: #6c757d;">Baseline</span>
-                            {% elif prediction.predicted_sales > ml_predictions[loop.index0 - 1].predicted_sales %}
-                                <span style="color: #28a745;">↗️ Increasing</span>
-                            {% elif prediction.predicted_sales < ml_predictions[loop.index0 - 1].predicted_sales %}
-                                <span style="color: #dc3545;">↘️ Decreasing</span>
-                            {% else %}
-                                <span style="color: #6c757d;">→ Stable</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <!-- INTERACTIVE TIME RANGE FILTER -->
+        <div class="filter-panel">
+            <h4 style="margin: 0 0 1.5rem 0;">🔍 Filter & Search Predictions</h4>
+            
+            <div class="table-search">
+                <input type="text" id="searchInput" placeholder="Search by date, sales amount, or performance level..." onkeyup="filterTable()">
+            </div>
+
+            <div class="filters-group">
+                <div class="filter-group">
+                    <label for="startDate">📅 Start Date</label>
+                    <input type="date" id="startDate" onchange="applyDateFilter()">
+                </div>
+                <div class="filter-group">
+                    <label for="endDate">📅 End Date</label>
+                    <input type="date" id="endDate" onchange="applyDateFilter()">
+                </div>
+                <div class="filter-group">
+                    <label for="salesRange">💰 Sales Range (Min)</label>
+                    <input type="number" id="minSales" placeholder="Min sales" onchange="applyFilters()">
+                </div>
+                <div class="filter-group">
+                    <label for="maxSales">💰 Sales Range (Max)</label>
+                    <input type="number" id="maxSales" placeholder="Max sales" onchange="applyFilters()">
+                </div>
+                <div class="filter-group">
+                    <label for="performanceFilter">🎯 Performance Level</label>
+                    <select id="performanceFilter" onchange="applyFilters()">
+                        <option value="">All Performance Levels</option>
+                        <option value="Excellent">🌟 Excellent</option>
+                        <option value="Good">👍 Good</option>
+                        <option value="Below Avg">⚠️ Below Average</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="riskFilter">⚠️ Risk Level</label>
+                    <select id="riskFilter" onchange="applyFilters()">
+                        <option value="">All Risk Levels</option>
+                        <option value="Low">✅ Low Risk</option>
+                        <option value="Medium">🟡 Medium Risk</option>
+                        <option value="High">⚠️ High Risk</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <button onclick="resetFilters()" style="background: #667eea; color: white; border: none; padding: 0.6rem; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 1.5rem;">
+                        Reset All Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison Chart: Predictions vs Historical -->
+        <div class="predictions-chart-container">
+            <h2 class="chart-title">📊 Predicted vs Historical Sales Trends</h2>
+            <div style="position: relative; height: 400px; width: 100%;">
+                <canvas id="comparisonChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Detailed Predictions Table - Enhanced with more user-friendly columns -->
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem; border-radius: 12px; margin: 2rem 0 1.5rem 0;">
+            <h3 style="margin: 0 0 0.5rem 0;">📋 Detailed Predictions Table</h3>
+            <p style="margin: 0; opacity: 0.9;">Next 30 days - Scroll right for more details</p>
+        </div>
+
+        <div style="overflow-x: auto; margin-bottom: 2rem;">
+            <div class="predictions-table">
+                <table style="min-width: 1200px;">
+                    <thead>
+                        <tr>
+                            <th>📅 Date</th>
+                            <th>🏬 Store</th>
+                            <th>💰 Predicted Sales</th>
+                            <th>📊 vs Avg</th>
+                            <th>📈 Trend</th>
+                            <th>🎯 Performance</th>
+                            <th>🎪 Seasonal</th>
+                            <th>⚠️ Risk</th>
+                            <th>📉 Range</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prediction in ml_predictions[:30] %}
+                        <tr style="transition: background-color 0.3s ease;" onmouseover="this.style.backgroundColor='#f8f9fa';" onmouseout="this.style.backgroundColor='white';">
+                            <td>
+                                <strong>{{ prediction.date }}</strong><br>
+                                <span style="font-size: 0.8rem; color: #666;">{{ prediction.day_name }}</span>
+                            </td>
+                            <td>{{ prediction.store_name }}</td>
+                            <td>
+                                <span class="sales-amount">${{ "%.0f"|format(prediction.predicted_sales) }}</span><br>
+                                <span style="font-size: 0.8rem; color: #666;">{{ prediction.week }}</span>
+                            </td>
+                            <td>
+                                <span style="color: {% if prediction.percent_vs_average[0] == '+' %}#28a745{% elif prediction.percent_vs_average[0] == '-' %}#dc3545{% else %}#6c757d{% endif %}; font-weight: 600;">
+                                    {{ prediction.percent_vs_average }}
+                                </span><br>
+                                <span style="font-size: 0.8rem; color: #666;">(Avg: ${{ "%.0f"|format(prediction.historical_average) }})</span>
+                            </td>
+                            <td>
+                                <strong>{{ prediction.trend_direction }}</strong><br>
+                                <span style="font-size: 0.8rem; color: #666;">{{ prediction.trend_percentage }}</span>
+                            </td>
+                            <td>
+                                <span class="badge" style="background-color: 
+                                    {% if prediction.performance_color == 'success' %}#28a745
+                                    {% elif prediction.performance_color == 'info' %}#17a2b8
+                                    {% else %}#ffc107
+                                    {% endif %}; color: white; padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.85rem;">
+                                    {{ prediction.performance }}
+                                </span>
+                            </td>
+                            <td>
+                                <span style="font-size: 0.9rem; background: #e8f5e9; padding: 0.3rem 0.6rem; border-radius: 4px; display: inline-block;">
+                                    {{ prediction.seasonal_note }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge" style="background-color: 
+                                    {% if prediction.risk_color == 'danger' %}#dc3545
+                                    {% elif prediction.risk_color == 'warning' %}#ffc107
+                                    {% else %}#28a745
+                                    {% endif %}; color: {% if prediction.risk_color == 'warning' %}#333{% else %}white{% endif %}; padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.85rem;">
+                                    {{ prediction.risk_level }}
+                                </span><br>
+                                <span style="font-size: 0.75rem; color: #666;">{{ prediction.risk_percentage }}</span>
+                            </td>
+                            <td>
+                                <span style="font-size: 0.8rem; color: #666;">
+                                    ${{ "%.0f"|format(prediction.confidence_lower) }} - ${{ "%.0f"|format(prediction.confidence_upper) }}<br>
+                                    <em style="color: #999;">Range: ${{ "%.0f"|format(prediction.confidence_range) }}</em>
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Monthly Predictions Table -->
+        {% if monthly_predictions %}
+        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 1.5rem; border-radius: 12px; margin: 2rem 0 1.5rem 0;">
+            <h3 style="margin: 0 0 0.5rem 0;">📅 Monthly Forecast Summary</h3>
+            <p style="margin: 0; opacity: 0.9;">Aggregated predictions by month</p>
+        </div>
+
+        <div style="overflow-x: auto; margin-bottom: 2rem;">
+            <div class="predictions-table">
+                <table style="min-width: 1000px;">
+                    <thead>
+                        <tr>
+                            <th>📆 Month</th>
+                            <th>💰 Total Sales</th>
+                            <th>📊 Daily Average</th>
+                            <th>📈 Min-Max Range</th>
+                            <th>📊 Days</th>
+                            <th>vs Historical Avg</th>
+                            <th>⚠️ Risk Level</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for month_pred in monthly_predictions %}
+                        <tr style="transition: background-color 0.3s ease;" onmouseover="this.style.backgroundColor='#f8f9fa';" onmouseout="this.style.backgroundColor='white';">
+                            <td><strong>{{ month_pred.month }}</strong></td>
+                            <td><span class="sales-amount">${{ "%.0f"|format(month_pred.total_sales) }}</span></td>
+                            <td>${{ "%.0f"|format(month_pred.avg_daily_sales) }}</td>
+                            <td>
+                                ${{ "%.0f"|format(month_pred.min_sales) }} - ${{ "%.0f"|format(month_pred.max_sales) }}<br>
+                                <span style="font-size: 0.8rem; color: #666;">Range: ${{ "%.0f"|format(month_pred.max_sales - month_pred.min_sales) }}</span>
+                            </td>
+                            <td>{{ month_pred.days_in_month }} days</td>
+                            <td>
+                                <span style="color: {% if month_pred.percent_vs_avg[0] == '+' %}#28a745{% elif month_pred.percent_vs_avg[0] == '-' %}#dc3545{% else %}#6c757d{% endif %}; font-weight: 600;">
+                                    {{ month_pred.percent_vs_avg }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge" style="background-color: 
+                                    {% if month_pred.risk_color == 'danger' %}#dc3545
+                                    {% elif month_pred.risk_color == 'warning' %}#ffc107
+                                    {% else %}#28a745
+                                    {% endif %}; color: {% if month_pred.risk_color == 'warning' %}#333{% else %}white{% endif %}; padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.85rem;">
+                                    {{ month_pred.risk_level }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Help Guide for Understanding Predictions -->
+        <div style="background: #f0f7ff; border-left: 4px solid #2196F3; padding: 1.5rem; border-radius: 8px; margin: 2rem 0;">
+            <h4 style="color: #1976D2; margin: 0 0 1rem 0;">📚 How to Read These Predictions</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
+                <div>
+                    <strong>💰 Predicted Sales:</strong> Expected sales value for that date
+                    <br><br>
+                    <strong>📊 vs Avg:</strong> How much higher/lower than historical average (positive = better)
+                    <br><br>
+                    <strong>📈 Trend:</strong> Is sales going up ⬆️, down ⬇️, or staying stable →?
+                </div>
+                <div>
+                    <strong>🎯 Performance:</strong> 
+                    <ul style="margin: 0.5rem 0 0 1rem; padding-left: 0;">
+                        <li>🌟 Excellent: Top 25% of sales</li>
+                        <li>👍 Good: Above average sales</li>
+                        <li>⚠️ Below Avg: Lower than median</li>
+                    </ul>
+                    <br>
+                    <strong>⚠️ Risk Level:</strong> Prediction confidence (Low = More confident)
+                    <br><br>
+                    <strong>📉 Range:</strong> Confidence interval - wider = less certain
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Statistics for Predictions -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value">${{ "%.0f"|format(ml_predictions|map(attribute='predicted_sales')|list|average) }}</div>
+                    <div class="metric-label">Average Forecast</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value">${{ "%.0f"|format(ml_predictions|map(attribute='predicted_sales')|list|max) }}</div>
+                    <div class="metric-label">Maximum Forecast</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value">${{ "%.0f"|format(ml_predictions|map(attribute='predicted_sales')|list|min) }}</div>
+                    <div class="metric-label">Minimum Forecast</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value">365</div>
+                    <div class="metric-label">Days Forecasted</div>
+                </div>
+            </div>
         </div>
 
         <!-- Feature Importance -->
@@ -383,29 +958,413 @@
             <h3>🔍 Feature Importance</h3>
             <p>Understanding which factors most influence your sales predictions:</p>
             <div class="feature-importance-chart">
-                <canvas id="featureImportanceChart" width="400" height="200"></canvas>
+                <div style="position: relative; height: 400px; width: 100%;">
+                    <canvas id="featureImportanceChart"></canvas>
+                </div>
             </div>
         </div>
         {% endif %}
 
-        <!-- Action Buttons -->
-        <div class="action-buttons">
-            <a href="/recommendation" class="btn-primary-custom">
-                💡 Get AI Recommendations
-            </a>
-            <a href="/analysis" class="btn-secondary-custom">
-                📊 View Detailed Analysis
-            </a>
+        <!-- Action Buttons - ENHANCED -->
+        <div style="margin-top: 2rem; padding: 1.5rem; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); border-radius: 12px;">
+            <h4 style="text-align: center; margin-bottom: 1.5rem; color: #2c3e50;">📋 What's Next?</h4>
+            <div class="action-buttons" style="flex-wrap: wrap;">
+                <button onclick="generateReport()" class="btn-primary-custom" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    📄 Generate Report
+                </button>
+                <a href="/api/download-predictions-csv" class="btn-primary-custom" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    📥 Download CSV
+                </a>
+                <a href="/recommendation" class="btn-primary-custom" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                    💡 Get AI Recommendations
+                </a>
+                <a href="/analysis" class="btn-secondary-custom">
+                    📊 View Detailed Analysis
+                </a>
+                <a href="/upload" class="btn-primary-custom" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    📤 Upload New Dataset
+                </a>
+            </div>
         </div>
+    </div>
 
-        {% endif %}
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="settings-modal">
+        <div class="settings-modal-content">
+            <span class="close-modal" onclick="closeSettingsModal()">&times;</span>
+            <h3 style="margin-top: 0;">⚙️ Prediction Settings</h3>
+            
+            <div style="margin: 2rem 0;">
+                <label style="font-weight: 600; display: block; margin-bottom: 1rem;">🎯 Confidence Level</label>
+                <input type="range" id="confidenceLevel" min="70" max="99" value="95" style="width: 100%;">
+                <div style="margin-top: 0.5rem; text-align: center; color: #666;">
+                    <span id="confidenceValue">95</span>% Confidence
+                </div>
+            </div>
+
+            <div style="margin: 2rem 0;">
+                <label style="font-weight: 600; display: block; margin-bottom: 1rem;">📅 Forecast Horizon</label>
+                <select id="forecastHorizon" style="width: 100%; padding: 0.6rem; border-radius: 6px; border: 2px solid #ddd;">
+                    <option value="30">30 Days</option>
+                    <option value="90">90 Days</option>
+                    <option value="180">6 Months</option>
+                    <option value="365" selected>365 Days (Full Year)</option>
+                </select>
+            </div>
+
+            <div style="margin: 2rem 0;">
+                <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">
+                    <input type="checkbox" id="showConfidenceRange" checked> Show Confidence Ranges
+                </label>
+                <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">
+                    <input type="checkbox" id="showTrends" checked> Show Trend Analysis
+                </label>
+                <label style="font-weight: 600; display: block;">
+                    <input type="checkbox" id="showSeasonality" checked> Show Seasonality
+                </label>
+            </div>
+
+            <button onclick="applySettings()" class="btn-primary-custom" style="width: 100%; margin-top: 1.5rem; text-align: center;">
+                Apply Settings
+            </button>
+        </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div id="shareModal" class="settings-modal">
+        <div class="settings-modal-content">
+            <span class="close-modal" onclick="closeShareModal()">&times;</span>
+            <h3 style="margin-top: 0;">📧 Share Predictions</h3>
+            
+            <div style="margin: 2rem 0;">
+                <label style="font-weight: 600; display: block; margin-bottom: 1rem;">Email Address</label>
+                <input type="email" id="shareEmail" placeholder="Enter email address" style="width: 100%; padding: 0.6rem; border-radius: 6px; border: 2px solid #ddd;">
+            </div>
+
+            <div style="margin: 2rem 0;">
+                <label style="font-weight: 600; display: block; margin-bottom: 1rem;">📋 Include in Email</label>
+                <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">
+                    <input type="checkbox" id="includeCharts" checked> Charts & Visuals
+                </label>
+                <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">
+                    <input type="checkbox" id="includeTable" checked> Detailed Table
+                </label>
+                <label style="font-weight: 600; display: block;">
+                    <input type="checkbox" id="includeInsights" checked> Key Insights
+                </label>
+            </div>
+
+            <div style="margin: 2rem 0;">
+                <label style="font-weight: 600; display: block; margin-bottom: 1rem;">Message (Optional)</label>
+                <textarea id="shareMessage" placeholder="Add a personal message..." style="width: 100%; padding: 0.6rem; border-radius: 6px; border: 2px solid #ddd; height: 100px;"></textarea>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <button onclick="sendViaEmail()" class="btn-primary-custom" style="text-align: center;">
+                    📨 Send Email
+                </button>
+                <button onclick="copyShareLink()" class="btn-primary-custom" style="text-align: center;">
+                    🔗 Copy Share Link
+                </button>
+            </div>
+        </div>
     </div>
 
     <script>
+        // Initialize Predictions Data
+        let allPredictions = {{ ml_predictions|tojson }};
+        let filteredPredictions = allPredictions;
+
+        // Toggle Dark Mode
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
+        }
+
+        // Load Dark Mode preference
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+        }
+
+        // Open/Close Modals
+        function openSettingsModal() {
+            document.getElementById('settingsModal').style.display = 'block';
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        function openShareModal() {
+            document.getElementById('shareModal').style.display = 'block';
+        }
+
+        function closeShareModal() {
+            document.getElementById('shareModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            let modal = document.getElementById('settingsModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+            let shareModal = document.getElementById('shareModal');
+            if (event.target === shareModal) {
+                shareModal.style.display = 'none';
+            }
+        };
+
+        // Confidence Level Slider
+        document.getElementById('confidenceLevel').addEventListener('input', function() {
+            document.getElementById('confidenceValue').innerText = this.value;
+        });
+
+        // Apply Settings
+        function applySettings() {
+            let horizon = document.getElementById('forecastHorizon').value;
+            let confidence = document.getElementById('confidenceLevel').value;
+            
+            fetch('/api/save-predictions-settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    confidenceLevel: confidence,
+                    forecastHorizon: horizon,
+                    showConfidenceRange: document.getElementById('showConfidenceRange').checked,
+                    showTrends: document.getElementById('showTrends').checked,
+                    showSeasonality: document.getElementById('showSeasonality').checked
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`Settings Applied!\nForecast: ${horizon} days\nConfidence: ${confidence}%`);
+                    closeSettingsModal();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to save settings');
+            });
+        }
+
+        // Populate Key Metrics Summary
+        function populateKeyMetrics() {
+            if (allPredictions.length === 0) return;
+
+            let maxPrediction = allPredictions.reduce((prev, current) => 
+                parseFloat(prev.predicted_sales) > parseFloat(current.predicted_sales) ? prev : current
+            );
+            let minPrediction = allPredictions.reduce((prev, current) => 
+                parseFloat(prev.predicted_sales) < parseFloat(current.predicted_sales) ? prev : current
+            );
+
+            // Find best promotional opportunity (highest predicted sales that's below 90 percentile)
+            let avgSales = allPredictions.reduce((sum, p) => sum + parseFloat(p.predicted_sales), 0) / allPredictions.length;
+            let promoOpportunity = allPredictions.filter(p => parseFloat(p.predicted_sales) > avgSales)
+                .sort((a, b) => parseFloat(b.predicted_sales) - parseFloat(a.predicted_sales))[0] || maxPrediction;
+
+            document.getElementById('biggest-opportunity').innerHTML = 
+                `<i class="fas fa-arrow-up"></i> $${parseFloat(maxPrediction.predicted_sales).toFixed(0)} on ${maxPrediction.date}`;
+            
+            document.getElementById('highest-risk').innerHTML = 
+                `<i class="fas fa-arrow-down"></i> $${parseFloat(minPrediction.predicted_sales).toFixed(0)} on ${minPrediction.date}`;
+            
+            document.getElementById('promo-opportunity').innerHTML = 
+                `<i class="fas fa-star"></i> $${parseFloat(promoOpportunity.predicted_sales).toFixed(0)} - ${promoOpportunity.date}`;
+        }
+
+        // Table Search & Filter Functions
+        function filterTable() {
+            let searchValue = document.getElementById('searchInput').value.toLowerCase();
+            let rows = document.querySelectorAll('.predictions-table tbody tr');
+            
+            rows.forEach(row => {
+                let text = row.innerText.toLowerCase();
+                row.style.display = text.includes(searchValue) ? '' : 'none';
+            });
+        }
+
+        function applyDateFilter() {
+            let startDate = document.getElementById('startDate').value;
+            let endDate = document.getElementById('endDate').value;
+            let rows = document.querySelectorAll('.predictions-table tbody tr');
+            
+            rows.forEach(row => {
+                let dateCell = row.querySelector('td:first-child');
+                let rowDate = dateCell.innerText.split('\n')[0];
+                
+                let showRow = true;
+                if (startDate && rowDate < startDate) showRow = false;
+                if (endDate && rowDate > endDate) showRow = false;
+                
+                row.style.display = showRow ? '' : 'none';
+            });
+        }
+
+        function applyFilters() {
+            let minSales = parseFloat(document.getElementById('minSales').value) || 0;
+            let maxSales = parseFloat(document.getElementById('maxSales').value) || Infinity;
+            let performance = document.getElementById('performanceFilter').value;
+            let risk = document.getElementById('riskFilter').value;
+            
+            let rows = document.querySelectorAll('.predictions-table tbody tr');
+            
+            rows.forEach(row => {
+                let cells = row.querySelectorAll('td');
+                let sales = parseFloat(cells[2].innerText.replace('$', '').replace(',', ''));
+                let perfCell = cells[5].innerText;
+                let riskCell = cells[7].innerText;
+                
+                let showRow = true;
+                if (sales < minSales || sales > maxSales) showRow = false;
+                if (performance && !perfCell.includes(performance)) showRow = false;
+                if (risk && !riskCell.includes(risk)) showRow = false;
+                
+                row.style.display = showRow ? '' : 'none';
+            });
+        }
+
+        function resetFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            document.getElementById('minSales').value = '';
+            document.getElementById('maxSales').value = '';
+            document.getElementById('performanceFilter').value = '';
+            document.getElementById('riskFilter').value = '';
+            
+            let rows = document.querySelectorAll('.predictions-table tbody tr');
+            rows.forEach(row => {
+                row.style.display = '';
+            });
+        }
+
+        // Export Functions
+        function exportToCSV() {
+            window.location.href = '/api/download-predictions-csv';
+        }
+
+        function exportToExcel() {
+            window.location.href = '/api/download-predictions-excel';
+        }
+
+        function exportToPDF() {
+            fetch('/api/generate-pdf-report')
+                .then(response => response.blob())
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'sales_predictions_report.pdf';
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to generate PDF report');
+                });
+        }
+
+        function exportToJSON() {
+            window.location.href = '/api/download-predictions-json';
+        }
+
+        // Generate Custom Report
+        function generateReport() {
+            fetch('/api/generate-pdf-report')
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to generate report');
+                    return response.blob();
+                })
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `sales_predictions_report_${new Date().toISOString().split('T')[0]}.pdf`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    alert('Report generated and downloaded successfully!');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to generate report: ' + error.message);
+                });
+        }
+
+        // Share via Email
+        function sendViaEmail() {
+            let email = document.getElementById('shareEmail').value;
+            if (!email) {
+                alert('Please enter an email address');
+                return;
+            }
+
+            fetch('/api/send-predictions-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    email: email,
+                    include_charts: document.getElementById('includeCharts').checked,
+                    include_table: document.getElementById('includeTable').checked,
+                    include_insights: document.getElementById('includeInsights').checked,
+                    message: document.getElementById('shareMessage').value
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    closeShareModal();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to send email');
+            });
+        }
+
+        // Copy Share Link
+        function copyShareLink() {
+            fetch('/api/create-share-link', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        navigator.clipboard.writeText(data.share_url);
+                        alert(`Share link copied to clipboard!\n\nLink: ${data.share_url}\n\nExpires in: ${data.expires_in_days} days`);
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to create share link');
+                });
+        }
+
         // Render Predictions Chart
-        {% if model_trained and ml_predictions %}
+        // Initialize predictions data from server (will be empty array if not available)
+        const allPredictions = {{ ml_predictions|tojson|default('[]') }};
+        
         document.addEventListener('DOMContentLoaded', function() {
-            const predictionsData = {{ ml_predictions|tojson }};
+            // Safely handle case where predictions might not be available
+            if (!allPredictions || allPredictions.length === 0) {
+                console.warn('No predictions data available');
+                return;
+            }
+            
+            populateKeyMetrics();
+            
+            const predictionsData = allPredictions;
 
             const ctx = document.getElementById('predictionsChart').getContext('2d');
             const chart = new Chart(ctx, {
@@ -503,6 +1462,54 @@
                     }
                 }
             });
+
+            // Render Comparison Chart
+            const comparisonCtx = document.getElementById('comparisonChart').getContext('2d');
+            const comparisonChart = new Chart(comparisonCtx, {
+                type: 'bar',
+                data: {
+                    labels: predictionsData.slice(0, 30).map(p => p.date),
+                    datasets: [{
+                        label: 'Predicted Sales',
+                        data: predictionsData.slice(0, 30).map(p => p.predicted_sales),
+                        backgroundColor: 'rgba(102, 126, 234, 0.6)',
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        borderWidth: 1
+                    }, {
+                        label: 'Historical Average',
+                        data: predictionsData.slice(0, 30).map(p => p.historical_average),
+                        backgroundColor: 'rgba(255, 193, 7, 0.6)',
+                        borderColor: 'rgba(255, 193, 7, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        }
+                    }
+                }
+            });
         });
 
         // Render Feature Importance Chart
@@ -548,7 +1555,6 @@
                 }
             }
         });
-        {% endif %}
         {% endif %}
     </script>
 

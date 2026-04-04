@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload Data - Seasonal Sales Forecasting</title>
+    <title>Upload Sales Data - Sales Forecasting System</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         .upload-container {
             max-width: 900px;
@@ -326,6 +328,32 @@
         <div class="upload-header">
             <h1>📤 Upload Your Sales Data</h1>
             <p>Get started by uploading your sales CSV file to begin your analysis journey</p>
+        </div>
+
+        <!-- ✨ NEW: One-Time Upload Feature Banner -->
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);">
+            <h3 style="margin: 0 0 1rem 0; font-size: 1.3rem;">⚡ Upload Once, Analyze Automatically!</h3>
+            <p style="margin: 0 0 1.5rem 0; opacity: 0.95;">Your data is intelligent - upload once and get:</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem;">
+                <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px;">
+                    <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">📊</div>
+                    <strong>Instant Analysis</strong>
+                    <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; opacity: 0.9;">Complete EDA and insights</p>
+                </div>
+                <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px;">
+                    <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🤖</div>
+                    <strong>Auto ML Training</strong>
+                    <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; opacity: 0.9;">Model trained automatically</p>
+                </div>
+                <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px;">
+                    <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">📈</div>
+                    <strong>365-Day Forecast</strong>
+                    <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; opacity: 0.9;">Predictions with insights</p>
+                </div>
+            </div>
+            <p style="margin: 1.5rem 0 0 0; font-size: 0.9rem; opacity: 0.85; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 1rem;">
+                ✅ No need to re-upload for predictions! One-time upload handles everything.
+            </p>
         </div>
 
         <!-- Main Content -->
